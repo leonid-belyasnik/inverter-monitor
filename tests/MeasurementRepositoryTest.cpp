@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -11,12 +12,16 @@
 
 int main()
 {
-    PostgresConnection connection(
-        "host=localhost port=5432 dbname=inverter_test user=inverter"
-    );
+    const char* connectionString = std::getenv("INVERTER_TEST_DB");
+    
+    if (connectionString == nullptr) {
+        connectionString =
+            "host=localhost port=5432 dbname=inverter_test user=inverter";
+    }
+    
+    PostgresConnection connection(connectionString);
 
-    if (!connection.isOk())
-    {
+    if (!connection.isOk()) {
         std::cerr << "Connection failed: "
                   << connection.errorMessage();
         return 1;
@@ -24,16 +29,14 @@ int main()
 
     DatabaseSchema schema(connection);
 
-    if (!schema.initialize())
-    {
+    if (!schema.initialize()) {
         std::cerr << "Schema initialization failed\n";
         return 1;
     }
 
     const auto beginResult = connection.execute("BEGIN");
 
-    if (!beginResult.isOk())
-    {
+    if (!beginResult.isOk()) {
         std::cerr << "Failed to begin transaction\n";
         return 1;
     }
@@ -51,8 +54,7 @@ int main()
 
     const auto measurementId = repository.save(measurement);
 
-    if (measurementId == 0)
-    {
+    if (measurementId == 0) {
         connection.execute("ROLLBACK");
         std::cerr << "Failed to save measurement\n";
         return 1;
@@ -65,15 +67,13 @@ int main()
 
     const auto result = connection.execute(query.c_str());
 
-    if (!result.isOk())
-    {
+    if (!result.isOk()) {
         connection.execute("ROLLBACK");
         std::cerr << "Failed to read measurement\n";
         return 1;
     }
 
-    if (result.rowCount() != 1)
-    {
+    if (result.rowCount() != 1) {
         connection.execute("ROLLBACK");
         std::cerr << "Expected exactly one measurement\n";
         return 1;
@@ -83,8 +83,7 @@ int main()
         std::stod(result.value(0, 1)) != measurement.gridPower ||
         std::stod(result.value(0, 2)) != measurement.batteryPower ||
         std::stod(result.value(0, 3)) != measurement.loadPower ||
-        std::stod(result.value(0, 4)) != measurement.batterySoc)
-    {
+        std::stod(result.value(0, 4)) != measurement.batterySoc) {
         connection.execute("ROLLBACK");
         std::cerr << "Stored measurement does not match\n";
         return 1;
@@ -92,8 +91,7 @@ int main()
 
     const auto rollbackResult = connection.execute("ROLLBACK");
 
-    if (!rollbackResult.isOk())
-    {
+    if (!rollbackResult.isOk()) {
         std::cerr << "Failed to rollback transaction\n";
         return 1;
     }

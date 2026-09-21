@@ -10,6 +10,23 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  test:
+    build:
+      context: .
+    environment:
+      INVERTER_TEST_DB: "host=postgres port=5432 dbname=inverter_test user=inverter password=${POSTGRES_PASSWORD}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["ctest", "--test-dir", "build", "--output-on-failure"]
+    profiles:
+      - test
 
 volumes:
   postgres_data:
