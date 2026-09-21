@@ -15,7 +15,14 @@ PostgresResult::PostgresResult(PGresult* result)
 
 bool PostgresResult::isOk() const
 {
-    return m_result && PQresultStatus(m_result.get()) == PGRES_TUPLES_OK;
+    if (!m_result) {
+    	return false;
+    }
+
+    const auto resultStatus = PQresultStatus(m_result.get());
+
+    return resultStatus == PGRES_TUPLES_OK ||
+           resultStatus == PGRES_COMMAND_OK;
 }
 
 const char* PostgresResult::errorMessage() const
