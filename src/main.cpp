@@ -2,37 +2,34 @@
 
 #include <libpq-fe.h>
 
+#include "PostgresConnection.h"
+#include "PostgresResult.h"
+
 int main()
 {
-    PGconn* conn = PQconnectdb(
+    PostgresConnection connection(
         "host=localhost port=5432 dbname=inverter user=inverter password=inverter_dev"
     );
 
-    if (PQstatus(conn) != CONNECTION_OK)
+    if (!connection.isOk())
     {
         std::cerr << "Connection failed: "
-                  << PQerrorMessage(conn);
-        PQfinish(conn);
+                  << connection.errorMessage();
         return 1;
     }
 
     std::cout << "Connected to PostgreSQL\n";
 
-    PGresult* result = PQexec(conn, "SELECT 1");
-
-    if (PQresultStatus(result) != PGRES_TUPLES_OK)
+    PostgresResult result(PQexec(connection.get(), "SELECT 1"));
+    
+    if (!result.isOk())
     {
         std::cerr << "Query failed: "
-                  << PQerrorMessage(conn);
-        PQclear(result);
-        PQfinish(conn);
+                  << result.errorMessage();
         return 1;
     }
-
-    std::cout << "Result: " << PQgetvalue(result, 0, 0) << '\n';
-
-    PQclear(result);
-    PQfinish(conn);
+    
+    std::cout << "Result: " << PQgetvalue(result.get(), 0, 0) << '\n';
 
     return 0;
 }
