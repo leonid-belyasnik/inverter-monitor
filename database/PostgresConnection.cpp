@@ -30,3 +30,23 @@ PostgresResult PostgresConnection::execute(const char* query) const
 {
     return PostgresResult(PQexec(m_connection.get(), query));
 }
+
+PostgresResult PostgresConnection::executeParams(
+    const char* query,
+    const int parameterCount,
+    const char* const* parameters
+) const
+{
+    return PostgresResult(
+        PQexecParams(
+            m_connection.get(),
+            query,
+            parameterCount,
+            nullptr,
+            parameters,
+            nullptr,
+            nullptr,
+            0
+        )
+    );
+}

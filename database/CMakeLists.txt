@@ -5,12 +5,14 @@ add_library(database STATIC)
 
 set(sources
     DatabaseSchema.cpp
+    MeasurementRepository.cpp
     PostgresConnection.cpp
     PostgresResult.cpp
 )
 
 set(headers
     DatabaseSchema.h
+    MeasurementRepository.h
     PostgresConnection.h
     PostgresResult.h
 )

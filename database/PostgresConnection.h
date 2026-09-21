@@ -16,6 +16,11 @@ public:
     const char* errorMessage() const;
 
     PostgresResult execute(const char* query) const;
+    PostgresResult executeParams(
+        const char* query,
+        int parameterCount,
+        const char* const* parameters
+    ) const;
 
 private:
     struct ConnectionDeleter
