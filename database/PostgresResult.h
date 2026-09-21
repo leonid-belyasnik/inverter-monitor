@@ -11,6 +11,11 @@ public:
     explicit PostgresResult(PGresult* result);
 
     bool isOk() const;
+    
+    int rowCount() const;
+    int columnCount() const;
+    const char* value(int row, int column) const;
+    
     const char* errorMessage() const;
 
     PGresult* get() const;

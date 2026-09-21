@@ -11,7 +11,7 @@
 int main()
 {
     PostgresConnection connection(
-        "host=localhost port=5432 dbname=inverter user=inverter password=inverter_dev"
+        "host=localhost port=5432 dbname=inverter user=inverter"
     );
 
     if (!connection.isOk())
@@ -44,12 +44,15 @@ int main()
         .batterySoc = 78.0
     };
     
-    if (!repository.save(measurement)) {
+    const auto measurementId = repository.save(measurement);
+    
+    if (measurementId == 0)
+    {
         std::cerr << "Failed to save measurement\n";
         return 1;
     }
     
-    std::cout << "Measurement saved\n";
+    std::cout << "Measurement saved, id = " << measurementId << '\n';
 
     return 0;
 }

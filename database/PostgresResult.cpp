@@ -25,6 +25,21 @@ bool PostgresResult::isOk() const
            resultStatus == PGRES_COMMAND_OK;
 }
 
+int PostgresResult::rowCount() const
+{
+    return PQntuples(m_result.get());
+}
+
+int PostgresResult::columnCount() const
+{
+    return PQnfields(m_result.get());
+}
+
+const char* PostgresResult::value(const int row, const int column) const
+{
+    return PQgetvalue(m_result.get(), row, column);
+}
+
 const char* PostgresResult::errorMessage() const
 {
     return m_result ? PQresultErrorMessage(m_result.get()) : "No result";

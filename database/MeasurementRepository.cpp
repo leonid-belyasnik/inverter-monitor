@@ -1,9 +1,11 @@
 #include <database/MeasurementRepository.h>
 
 #include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <string>
 
 #include <database/PostgresConnection.h>
 #include <database/PostgresResult.h>
@@ -39,7 +41,7 @@ MeasurementRepository::MeasurementRepository(PostgresConnection& connection)
 {
 }
 
-bool MeasurementRepository::save(const Measurement& measurement)
+std::int64_t MeasurementRepository::save(const Measurement& measurement)
 {
     const std::string measuredAt = formatTimestamp(measurement.measuredAt);
     const std::string pvPower = formatDouble(measurement.pvPower);
@@ -60,10 +62,16 @@ bool MeasurementRepository::save(const Measurement& measurement)
     const auto result = m_connection.executeParams(
         "INSERT INTO measurements "
         "(measured_at, pv_power, grid_power, battery_power, load_power, battery_soc) "
-        "VALUES ($1, $2, $3, $4, $5, $6)",
+        "VALUES ($1, $2, $3, $4, $5, $6) "
+        "RETURNING id",
         6,
         values
     );
 
-    return result.isOk();
+    if (!result.isOk() || result.rowCount() != 1)
+    {
+        return 0;
+    }
+
+    return std::stoll(result.value(0, 0));
 }
