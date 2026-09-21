@@ -1,5 +1,7 @@
 #include "PostgresConnection.h"
 
+#include <libpq-fe.h>
+
 #include "PostgresResult.h"
 
 void PostgresConnection::ConnectionDeleter::operator()(PGconn* connection) const

@@ -1,9 +1,8 @@
 #include <iostream>
 
-#include <libpq-fe.h>
-
-#include "PostgresConnection.h"
-#include "PostgresResult.h"
+#include <database/DatabaseSchema.h>
+#include <database/PostgresConnection.h>
+#include <database/PostgresResult.h>
 
 int main()
 {
@@ -20,16 +19,15 @@ int main()
 
     std::cout << "Connected to PostgreSQL\n";
 
-    auto result = connection.execute("SELECT 1");
+    DatabaseSchema schema(connection);
     
-    if (!result.isOk())
+    if (!schema.initialize())
     {
-        std::cerr << "Query failed: "
-                  << result.errorMessage();
+        std::cerr << "Database schema initialization failed\n";
         return 1;
     }
     
-    std::cout << "Result: " << PQgetvalue(result.get(), 0, 0) << '\n';
+    std::cout << "Database schema initialized\n";;
 
     return 0;
 }

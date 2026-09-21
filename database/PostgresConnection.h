@@ -2,7 +2,8 @@
 
 #include <memory>
 
-#include <libpq-fe.h>
+struct pg_conn;
+using PGconn = pg_conn;
 
 class PostgresResult;
 
