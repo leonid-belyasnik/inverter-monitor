@@ -10,12 +10,9 @@
 
 int main()
 {
-    PostgresConnection connection(
-        "host=localhost port=5432 dbname=inverter user=inverter"
-    );
+    PostgresConnection connection("");
 
-    if (!connection.isOk())
-    {
+    if (!connection.isOk()) {
         std::cerr << "Connection failed: "
                   << connection.errorMessage();
         return 1;
@@ -25,8 +22,7 @@ int main()
 
     DatabaseSchema schema(connection);
     
-    if (!schema.initialize())
-    {
+    if (!schema.initialize()) {
         std::cerr << "Database schema initialization failed\n";
         return 1;
     }
@@ -46,8 +42,7 @@ int main()
     
     const auto measurementId = repository.save(measurement);
     
-    if (measurementId == 0)
-    {
+    if (measurementId == 0) {
         std::cerr << "Failed to save measurement\n";
         return 1;
     }

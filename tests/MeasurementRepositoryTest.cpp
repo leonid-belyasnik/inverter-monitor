@@ -1,6 +1,5 @@
 #include <chrono>
 #include <cstdint>
-#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -12,14 +11,7 @@
 
 int main()
 {
-    const char* connectionString = std::getenv("INVERTER_TEST_DB");
-    
-    if (connectionString == nullptr) {
-        connectionString =
-            "host=localhost port=5432 dbname=inverter_test user=inverter";
-    }
-    
-    PostgresConnection connection(connectionString);
+    PostgresConnection connection("");
 
     if (!connection.isOk()) {
         std::cerr << "Connection failed: "

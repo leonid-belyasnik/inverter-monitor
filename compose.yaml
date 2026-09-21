@@ -20,7 +20,13 @@ services:
     build:
       context: .
     environment:
-      INVERTER_TEST_DB: "host=postgres port=5432 dbname=inverter_test user=inverter password=${POSTGRES_PASSWORD}"
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: inverter_test
+      PGUSER: inverter
+      PGPASSFILE: /run/secrets/db_password
+    secrets:
+      - db_password
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,3 +36,7 @@ services:
 
 volumes:
   postgres_data:
+
+secrets:
+  db_password:
+    file: ./docker/test.pgpass

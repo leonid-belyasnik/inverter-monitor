@@ -1,3 +1,4 @@
 build/
 .git/
 .env
+docker/test.pgpass
