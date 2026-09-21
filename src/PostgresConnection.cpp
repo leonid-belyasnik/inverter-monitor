@@ -1,10 +1,12 @@
 #include "PostgresConnection.h"
 
+#include "PostgresResult.h"
+
 void PostgresConnection::ConnectionDeleter::operator()(PGconn* connection) const
 {
     if (connection) {
     	PQfinish(connection);	
-    }     
+    }
 }
 
 PostgresConnection::PostgresConnection(const char* connectionString)
@@ -22,7 +24,7 @@ const char* PostgresConnection::errorMessage() const
     return m_connection ? PQerrorMessage(m_connection.get()) : "No connection";
 }
 
-PGconn* PostgresConnection::get() const
+PostgresResult PostgresConnection::execute(const char* query) const
 {
-    return m_connection.get();
+    return PostgresResult(PQexec(m_connection.get(), query));
 }

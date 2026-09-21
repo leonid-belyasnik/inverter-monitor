@@ -4,6 +4,8 @@
 
 #include <libpq-fe.h>
 
+class PostgresResult;
+
 class PostgresConnection
 {
 public:
@@ -12,7 +14,7 @@ public:
     bool isOk() const;
     const char* errorMessage() const;
 
-    PGconn* get() const;
+    PostgresResult execute(const char* query) const;
 
 private:
     struct ConnectionDeleter

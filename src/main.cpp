@@ -20,7 +20,7 @@ int main()
 
     std::cout << "Connected to PostgreSQL\n";
 
-    PostgresResult result(PQexec(connection.get(), "SELECT 1"));
+    auto result = connection.execute("SELECT 1");
     
     if (!result.isOk())
     {
