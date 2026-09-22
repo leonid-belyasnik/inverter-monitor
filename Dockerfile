@@ -14,5 +14,22 @@ WORKDIR /app
 
 COPY . .
 
-RUN cmake -S . -B build \
-    && cmake --build build
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build -j"$(nproc)"
+
+
+FROM ubuntu:24.04 AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libpq5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /usr/sbin/nologin app
+
+WORKDIR /app
+
+COPY --from=build /app/build/inverter-monitor /usr/local/bin/inverter-monitor
+
+USER app
+
+ENTRYPOINT ["/usr/local/bin/inverter-monitor"]

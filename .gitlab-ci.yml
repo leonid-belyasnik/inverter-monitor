@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - image
 
 build:
   stage: build
@@ -39,3 +40,15 @@ test:
     - apt-get install -y cmake libpq5 postgresql-client
     - until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done
     - ctest --test-dir build --output-on-failure
+
+container_image:
+  stage: image
+  image: docker:cli
+
+  script:
+    - docker version
+    - docker build --target runtime -t inverter-monitor:$CI_COMMIT_SHORT_SHA .
+    - docker image inspect inverter-monitor:$CI_COMMIT_SHORT_SHA
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'

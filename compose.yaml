@@ -19,6 +19,7 @@ services:
   test:
     build:
       context: .
+      target: build
     environment:
       PGHOST: postgres
       PGPORT: 5432
