@@ -28,7 +28,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=build /app/build/inverter-monitor /usr/local/bin/inverter-monitor
+COPY --from=build /app/build/src/inverter-monitor /usr/local/bin/inverter-monitor
 
 USER app
 
