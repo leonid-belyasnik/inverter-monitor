@@ -41,14 +41,15 @@ test:
     - until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done
     - ctest --test-dir build --output-on-failure
 
-container_image:
+publish_image:
   stage: image
   image: docker:cli
 
   script:
-    - docker version
-    - docker build --target runtime -t inverter-monitor:$CI_COMMIT_SHORT_SHA .
-    - docker image inspect inverter-monitor:$CI_COMMIT_SHORT_SHA
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - docker build --target runtime -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" .
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
 
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
