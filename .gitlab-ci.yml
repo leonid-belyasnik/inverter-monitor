@@ -10,6 +10,11 @@ build:
     - cmake -S . -B build
     - cmake --build build -j2
 
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 day
+
 test:
   stage: test
   image: ubuntu:24.04
@@ -31,8 +36,6 @@ test:
 
   script:
     - apt-get update
-    - apt-get install -y cmake g++ make pkg-config libpq-dev postgresql-client
+    - apt-get install -y cmake libpq5 postgresql-client
     - until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done
-    - cmake -S . -B build
-    - cmake --build build -j2
     - ctest --test-dir build --output-on-failure
