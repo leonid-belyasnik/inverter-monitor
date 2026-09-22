@@ -1,5 +1,6 @@
 stages:
   - build
+  - test
 
 build:
   stage: build
@@ -8,3 +9,30 @@ build:
     - apt-get install -y cmake g++ make pkg-config libpq-dev
     - cmake -S . -B build
     - cmake --build build -j2
+
+test:
+  stage: test
+  image: ubuntu:24.04
+
+  services:
+    - name: postgres:17
+      alias: postgres
+
+  variables:
+    FF_NETWORK_PER_BUILD: "1"
+    POSTGRES_DB: "inverter_test"
+    POSTGRES_USER: "inverter"
+    POSTGRES_PASSWORD: "test_password"
+    PGHOST: "postgres"
+    PGPORT: "5432"
+    PGDATABASE: "inverter_test"
+    PGUSER: "inverter"
+    PGPASSWORD: "test_password"
+
+  script:
+    - apt-get update
+    - apt-get install -y cmake g++ make pkg-config libpq-dev postgresql-client
+    - until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done
+    - cmake -S . -B build
+    - cmake --build build -j2
+    - ctest --test-dir build --output-on-failure
