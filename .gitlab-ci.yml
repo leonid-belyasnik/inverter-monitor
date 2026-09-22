@@ -5,6 +5,6 @@ build:
   stage: build
   script:
     - apt-get update
-    - apt-get install -y cmake g++ make
+    - apt-get install -y cmake g++ make pkg-config libpq-dev
     - cmake -S . -B build
     - cmake --build build -j2
