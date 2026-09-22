@@ -1,0 +1,10 @@
+stages:
+  - build
+
+build:
+  stage: build
+  script:
+    - apt-get update
+    - apt-get install -y cmake g++ make
+    - cmake -S . -B build
+    - cmake --build build -j2
