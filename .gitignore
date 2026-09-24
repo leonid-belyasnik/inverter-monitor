@@ -3,3 +3,5 @@
 build/
 .env
 docker/test.pgpass
+docker/mosquitto/data/
+docker/mosquitto/log/

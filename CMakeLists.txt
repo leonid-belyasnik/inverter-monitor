@@ -11,7 +11,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(domain)
 add_subdirectory(database)
-add_subdirectory(src)
+add_subdirectory(backend)
+add_subdirectory(simulator)
+
 
 include(CTest)
 
