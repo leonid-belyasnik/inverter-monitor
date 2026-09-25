@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(Boost 1.75 REQUIRED COMPONENTS json)
+
 add_subdirectory(domain)
 add_subdirectory(database)
 add_subdirectory(backend)

@@ -1,0 +1,71 @@
+#include <chrono>
+#include <string>
+
+#include <gtest/gtest.h>
+
+#include <domain/Measurement.h>
+#include <protocol/TelemetryParser.h>
+
+TEST(TelemetryParserTest, ParsesValidTelemetry)
+{
+    const std::string payload = R"json(
+{
+    "schema_version": 1,
+    "seq": 38,
+    "measured_at": "2026-09-24T18:50:00.316Z",
+    "measurement": {
+        "pv_power_w": 1924.66,
+        "grid_power_w": -200.00,
+        "battery_power_w": -449.73,
+        "load_power_w": 1274.93,
+        "battery_soc_pct": 75.16
+    }
+}
+)json";
+
+    const TelemetryParser parser;
+
+    const auto measurement = parser.parse(payload);
+
+    ASSERT_TRUE(measurement.has_value());
+
+    EXPECT_DOUBLE_EQ(measurement->pvPower, 1924.66);
+    EXPECT_DOUBLE_EQ(measurement->gridPower, -200.00);
+    EXPECT_DOUBLE_EQ(measurement->batteryPower, -449.73);
+    EXPECT_DOUBLE_EQ(measurement->loadPower, 1274.93);
+    EXPECT_DOUBLE_EQ(measurement->batterySoc, 75.16);
+
+    const auto expectedTime =
+        std::chrono::system_clock::from_time_t(
+            1790275800)
+        + std::chrono::milliseconds(316);
+
+    EXPECT_EQ(measurement->measuredAt, expectedTime);
+}
+
+TEST(TelemetryParserTest, RejectsInvalidJson)
+{
+    const TelemetryParser parser;
+
+    const auto measurement =
+        parser.parse("{ invalid json");
+
+    EXPECT_FALSE(measurement.has_value());
+}
+
+TEST(TelemetryParserTest, RejectsMissingMeasurement)
+{
+    const std::string payload = R"json(
+{
+    "schema_version": 1,
+    "seq": 38,
+    "measured_at": "2026-09-24T18:50:00.316Z"
+}
+)json";
+
+    const TelemetryParser parser;
+
+    const auto measurement = parser.parse(payload);
+
+    EXPECT_FALSE(measurement.has_value());
+}

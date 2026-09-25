@@ -1,4 +1,5 @@
 add_subdirectory(mqtt)
+add_subdirectory(protocol)
 
 add_executable(inverter-monitor)
 
@@ -11,4 +12,5 @@ target_link_libraries(inverter-monitor
     PRIVATE
         database
         mqtt
+        protocol
 )
