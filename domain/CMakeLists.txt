@@ -2,6 +2,7 @@ add_library(domain INTERFACE)
 
 target_sources(domain
     INTERFACE
+        DeviceId.h
         Measurement.h
 )
 

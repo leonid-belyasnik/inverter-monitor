@@ -6,7 +6,9 @@ add_executable(measurement_repository_test
 
 target_link_libraries(measurement_repository_test
     PRIVATE
+        application
         database
+        mqtt
         GTest::gtest_main
 )
 
@@ -28,4 +30,19 @@ target_link_libraries(telemetry_parser_test
 add_test(
     NAME TelemetryParserTest
     COMMAND telemetry_parser_test
+)
+
+add_executable(telemetry_adapter_test
+    TelemetryAdapterTest.cpp
+)
+
+target_link_libraries(telemetry_adapter_test
+    PRIVATE
+        mqtt
+        GTest::gtest_main
+)
+
+add_test(
+    NAME TelemetryAdapterTest
+    COMMAND telemetry_adapter_test
 )
