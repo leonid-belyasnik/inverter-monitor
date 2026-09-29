@@ -10,6 +10,8 @@
 #include <database/PostgresConnection.h>
 #include <database/PostgresResult.h>
 
+namespace database {
+
 namespace
 {
 
@@ -41,7 +43,7 @@ MeasurementRepository::MeasurementRepository(PostgresConnection& connection)
 {
 }
 
-std::int64_t MeasurementRepository::save(const Measurement& measurement)
+std::int64_t MeasurementRepository::save(const domain::Measurement& measurement)
 {
     const std::string measuredAt = formatTimestamp(measurement.measuredAt);
     const std::string pvPower = formatDouble(measurement.pvPower);
@@ -75,3 +77,5 @@ std::int64_t MeasurementRepository::save(const Measurement& measurement)
 
     return std::stoll(result.value(0, 0));
 }
+
+} // namespace database

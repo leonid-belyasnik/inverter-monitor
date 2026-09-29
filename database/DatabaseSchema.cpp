@@ -3,6 +3,8 @@
 #include "PostgresConnection.h"
 #include "PostgresResult.h"
 
+namespace database {
+
 DatabaseSchema::DatabaseSchema(PostgresConnection& connection)
     : m_connection(connection)
 {
@@ -24,3 +26,5 @@ bool DatabaseSchema::initialize()
 
     return result.isOk();
 }
+
+} // namespace database

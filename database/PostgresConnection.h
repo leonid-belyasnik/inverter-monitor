@@ -3,6 +3,9 @@
 #include <memory>
 
 struct pg_conn;
+
+namespace database {
+
 using PGconn = pg_conn;
 
 class PostgresResult;
@@ -32,3 +35,5 @@ private:
 
     ConnectionPtr m_connection;
 };
+
+} // namespace database

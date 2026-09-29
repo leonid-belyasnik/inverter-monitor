@@ -46,7 +46,9 @@ parseTimestamp(const std::string_view value)
 
 } // namespace
 
-std::optional<Measurement> TelemetryParser::parse(
+namespace protocol {
+
+std::optional<domain::Measurement> TelemetryParser::parse(
     const std::string_view payload) const
 {
     try {
@@ -61,7 +63,7 @@ std::optional<Measurement> TelemetryParser::parse(
         const auto& measurement =
             object.at("measurement").as_object();
 
-        Measurement result;
+        domain::Measurement result;
 
         result.pvPower =
             measurement.at("pv_power_w").to_number<double>();
@@ -93,3 +95,5 @@ std::optional<Measurement> TelemetryParser::parse(
         return std::nullopt;
     }
 }
+
+} // namespace protocol

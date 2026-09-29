@@ -1,5 +1,7 @@
 #pragma once
 
+namespace database {
+
 class PostgresConnection;
 
 class DatabaseSchema
@@ -12,3 +14,5 @@ public:
 private:
     PostgresConnection& m_connection;
 };
+
+} // namespace database

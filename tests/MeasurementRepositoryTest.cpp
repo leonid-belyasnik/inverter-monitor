@@ -12,13 +12,13 @@
 
 TEST(MeasurementRepositoryTest, SavesAndReadsMeasurement)
 {
-    PostgresConnection connection("");
+    database::PostgresConnection connection("");
 
     ASSERT_TRUE(connection.isOk())
         << "Connection failed: "
         << connection.errorMessage();
 
-    DatabaseSchema schema(connection);
+    database::DatabaseSchema schema(connection);
 
     ASSERT_TRUE(schema.initialize())
         << "Schema initialization failed";
@@ -28,9 +28,9 @@ TEST(MeasurementRepositoryTest, SavesAndReadsMeasurement)
     ASSERT_TRUE(beginResult.isOk())
         << "Failed to begin transaction";
 
-    MeasurementRepository repository(connection);
+    database::MeasurementRepository repository(connection);
 
-    const Measurement measurement{
+    const domain::Measurement measurement{
         .measuredAt = std::chrono::system_clock::now(),
         .pvPower = 1234.0,
         .gridPower = -100.0,

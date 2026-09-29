@@ -4,6 +4,8 @@
 
 #include "PostgresResult.h"
 
+namespace database {
+
 void PostgresConnection::ConnectionDeleter::operator()(PGconn* connection) const
 {
     if (connection) {
@@ -50,3 +52,5 @@ PostgresResult PostgresConnection::executeParams(
         )
     );
 }
+
+} // namespace database

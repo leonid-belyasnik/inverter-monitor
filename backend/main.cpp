@@ -53,7 +53,7 @@ std::cout
     << mqttHost << ':' << mqttPort
     << '\n';
 
-MqttClient mqtt(
+mqtt::MqttClient mqtt(
     "inverter-monitor-backend",
     mqttHost,
     mqttPort,

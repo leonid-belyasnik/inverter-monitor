@@ -7,6 +7,8 @@
 struct mosquitto;
 struct mosquitto_message;
 
+namespace mqtt {
+
 class MqttClient
 {
 public:
@@ -58,3 +60,5 @@ private:
 
     std::string m_errorMessage;
 };
+
+} // namespace mqtt

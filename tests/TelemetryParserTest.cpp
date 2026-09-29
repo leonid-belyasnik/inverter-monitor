@@ -23,7 +23,7 @@ TEST(TelemetryParserTest, ParsesValidTelemetry)
 }
 )json";
 
-    const TelemetryParser parser;
+    const protocol::TelemetryParser parser;
 
     const auto measurement = parser.parse(payload);
 
@@ -45,7 +45,7 @@ TEST(TelemetryParserTest, ParsesValidTelemetry)
 
 TEST(TelemetryParserTest, RejectsInvalidJson)
 {
-    const TelemetryParser parser;
+    const protocol::TelemetryParser parser;
 
     const auto measurement =
         parser.parse("{ invalid json");
@@ -63,7 +63,7 @@ TEST(TelemetryParserTest, RejectsMissingMeasurement)
 }
 )json";
 
-    const TelemetryParser parser;
+    const protocol::TelemetryParser parser;
 
     const auto measurement = parser.parse(payload);
 

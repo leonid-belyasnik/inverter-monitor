@@ -66,7 +66,7 @@ std::string formatTimestamp(
 }
 
 std::string formatMeasurement(
-    const Measurement& measurement,
+    const domain::Measurement& measurement,
     const std::uint64_t sequence)
 {
     std::ostringstream stream;
@@ -91,7 +91,7 @@ std::string formatMeasurement(
     return stream.str();
 }
 
-Measurement generateMeasurement(
+domain::Measurement generateMeasurement(
     const std::uint64_t sequence,
     const std::chrono::system_clock::time_point now)
 {
@@ -113,7 +113,7 @@ Measurement generateMeasurement(
     const double batterySoc =
         73.0 + 4.0 * std::sin(phase * 0.1);
 
-    return Measurement{
+    return domain::Measurement{
         .measuredAt = now,
         .pvPower = pvPower,
         .gridPower = gridPower,
@@ -200,7 +200,7 @@ int main()
     while (true) {
         const auto now = std::chrono::system_clock::now();
 
-        const Measurement measurement =
+        const domain::Measurement measurement =
             generateMeasurement(sequence, now);
 
         const std::string payload =

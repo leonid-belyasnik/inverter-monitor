@@ -5,6 +5,8 @@
 #include <iostream>
 #include <utility>
 
+namespace mqtt {
+
 MqttClient::MqttClient(
     std::string clientId,
     std::string host,
@@ -205,3 +207,5 @@ void MqttClient::onDisconnect(
         << mosquitto_strerror(result)
         << '\n';
 }
+
+} // namespace mqtt

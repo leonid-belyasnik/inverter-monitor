@@ -2,6 +2,8 @@
 
 #include <libpq-fe.h>
 
+namespace database {
+
 void PostgresResult::ResultDeleter::operator()(PGresult* result) const
 {
     if (result)
@@ -49,3 +51,5 @@ PGresult* PostgresResult::get() const
 {
     return m_result.get();
 }
+
+} // namespace database
