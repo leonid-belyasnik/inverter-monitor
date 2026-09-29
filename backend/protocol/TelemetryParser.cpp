@@ -27,12 +27,24 @@ parseTimestamp(const std::string_view value)
 
     stream.get();
 
-    int milliseconds = 0;
-    stream >> milliseconds;
+    std::string fractional;
+    stream >> fractional;
 
-    if (stream.fail() || stream.peek() != 'Z') {
+    if (stream.fail() || fractional.empty() || fractional.back() != 'Z') {
         return std::nullopt;
     }
+
+    fractional.pop_back();
+
+    if (fractional.empty() || fractional.size() > 3) {
+        return std::nullopt;
+    }
+
+    while (fractional.size() < 3) {
+        fractional += '0';
+    }
+
+    const int milliseconds = std::stoi(fractional);
 
     const std::time_t seconds = timegm(&tm);
 

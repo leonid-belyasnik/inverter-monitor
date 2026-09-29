@@ -43,6 +43,37 @@ TEST(TelemetryParserTest, ParsesValidTelemetry)
     EXPECT_EQ(measurement->measuredAt, expectedTime);
 }
 
+TEST(TelemetryParserTest, ParsesTimestampWithTwoFractionalDigits)
+{
+    const std::string payload = R"json(
+{
+    "schema_version": 1,
+    "seq": 39,
+    "measured_at": "2026-09-24T18:50:00.31Z",
+    "measurement": {
+        "pv_power_w": 100.0,
+        "grid_power_w": 200.0,
+        "battery_power_w": 300.0,
+        "load_power_w": 400.0,
+        "battery_soc_pct": 50.0
+    }
+}
+)json";
+
+    const protocol::TelemetryParser parser;
+
+    const auto measurement = parser.parse(payload);
+
+    ASSERT_TRUE(measurement.has_value());
+
+    const auto expectedTime =
+        std::chrono::system_clock::from_time_t(
+            1790275800)
+        + std::chrono::milliseconds(310);
+
+    EXPECT_EQ(measurement->measuredAt, expectedTime);
+}
+
 TEST(TelemetryParserTest, RejectsInvalidJson)
 {
     const protocol::TelemetryParser parser;
