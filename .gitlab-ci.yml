@@ -7,7 +7,7 @@ build:
   stage: build
   script:
     - apt-get update
-    - apt-get install -y cmake g++ make pkg-config libpq-dev
+    - apt-get install -y cmake g++ make pkg-config libpq-dev libboost-json-dev libmosquitto-dev libgtest-dev
     - cmake -S . -B build
     - cmake --build build -j2
 
@@ -37,7 +37,7 @@ test:
 
   script:
     - apt-get update
-    - apt-get install -y cmake libpq5 postgresql-client
+    - apt-get install -y cmake libpq5 postgresql-client libboost-json1.83.0 libmosquitto1
     - until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done
     - ctest --test-dir build --output-on-failure
 
