@@ -8,6 +8,9 @@ RUN apt-get update \
         cmake \
         pkg-config \
         libpq-dev \
+        libboost-json-dev \
+        libmosquitto-dev \
+        libgtest-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

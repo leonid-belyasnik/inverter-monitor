@@ -10,6 +10,8 @@
 #include <database/PostgresConnection.h>
 #include <database/PostgresResult.h>
 
+namespace database {
+
 namespace
 {
 
@@ -41,7 +43,9 @@ MeasurementRepository::MeasurementRepository(PostgresConnection& connection)
 {
 }
 
-std::int64_t MeasurementRepository::save(const Measurement& measurement)
+std::int64_t MeasurementRepository::save(
+    const domain::DeviceId& deviceId,
+    const domain::Measurement& measurement)
 {
     const std::string measuredAt = formatTimestamp(measurement.measuredAt);
     const std::string pvPower = formatDouble(measurement.pvPower);
@@ -51,6 +55,7 @@ std::int64_t MeasurementRepository::save(const Measurement& measurement)
     const std::string batterySoc = formatDouble(measurement.batterySoc);
 
     const char* values[] = {
+        deviceId.value.c_str(),
         measuredAt.c_str(),
         pvPower.c_str(),
         gridPower.c_str(),
@@ -61,10 +66,10 @@ std::int64_t MeasurementRepository::save(const Measurement& measurement)
 
     const auto result = m_connection.executeParams(
         "INSERT INTO measurements "
-        "(measured_at, pv_power, grid_power, battery_power, load_power, battery_soc) "
-        "VALUES ($1, $2, $3, $4, $5, $6) "
+        "(device_id, measured_at, pv_power, grid_power, battery_power, load_power, battery_soc) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7) "
         "RETURNING id",
-        6,
+        7,
         values
     );
 
@@ -75,3 +80,5 @@ std::int64_t MeasurementRepository::save(const Measurement& measurement)
 
     return std::stoll(result.value(0, 0));
 }
+
+} // namespace database

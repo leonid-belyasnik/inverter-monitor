@@ -3,6 +3,9 @@
 #include <memory>
 
 struct pg_result;
+
+namespace database {
+
 using PGresult = struct pg_result;
 
 class PostgresResult
@@ -30,3 +33,5 @@ private:
 
     ResultPtr m_result;
 };
+
+} // namespace database

@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+namespace domain {
+
 struct Measurement
 {
 	std::chrono::system_clock::time_point measuredAt;
@@ -11,3 +13,5 @@ struct Measurement
     double loadPower;
     double batterySoc;
 };
+
+} // namespace domain
