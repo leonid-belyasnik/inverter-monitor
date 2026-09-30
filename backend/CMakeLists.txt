@@ -1,6 +1,7 @@
-add_subdirectory(protocol)
+add_subdirectory(api)
 add_subdirectory(application)
 add_subdirectory(mqtt)
+add_subdirectory(protocol)
 
 add_executable(inverter-monitor)
 
