@@ -1,6 +1,7 @@
 add_library(application STATIC
-    TelemetryIngestionService.cpp
     IngestedMeasurement.h
+    MeasurementQueryService.cpp
+    TelemetryIngestionService.cpp
     TelemetryIngestionService.h
 )
 

@@ -1,4 +1,6 @@
 add_library(api STATIC
+    ApiRoutes.cpp
+    HttpRouter.cpp
     HttpServer.cpp
 )
 
@@ -9,6 +11,7 @@ target_include_directories(api
 
 target_link_libraries(api
     PUBLIC
+        application
         Boost::headers
         Boost::json
 )
