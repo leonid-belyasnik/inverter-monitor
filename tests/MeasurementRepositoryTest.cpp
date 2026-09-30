@@ -83,3 +83,68 @@ TEST(MeasurementRepositoryTest, IngestsAndPersistsMeasurementWithDeviceId)
     ASSERT_TRUE(rollbackResult.isOk())
         << "Failed to rollback transaction";
 }
+
+TEST(MeasurementRepositoryTest, FindsMeasurementsByDevice)
+{
+    database::PostgresConnection connection("");
+
+    ASSERT_TRUE(connection.isOk())
+        << "Connection failed: "
+        << connection.errorMessage();
+
+    database::DatabaseSchema schema(connection);
+
+    ASSERT_TRUE(schema.initialize())
+        << "Schema initialization failed";
+
+    const auto beginResult = connection.execute("BEGIN");
+
+    ASSERT_TRUE(beginResult.isOk())
+        << "Failed to begin transaction";
+
+    database::MeasurementRepository repository(connection);
+
+    const domain::DeviceId deviceId{"deye-001"};
+
+    const domain::Measurement measurement1{
+        .measuredAt = std::chrono::system_clock::from_time_t(1779706200),
+        .pvPower = 1000.0,
+        .gridPower = -100.0,
+        .batteryPower = 300.0,
+        .loadPower = 1200.0,
+        .batterySoc = 70.0
+    };
+
+    const domain::Measurement measurement2{
+        .measuredAt = std::chrono::system_clock::from_time_t(1779706260),
+        .pvPower = 2000.0,
+        .gridPower = -200.0,
+        .batteryPower = 400.0,
+        .loadPower = 2200.0,
+        .batterySoc = 71.0
+    };
+
+    ASSERT_NE(repository.save(deviceId, measurement1), 0);
+    ASSERT_NE(repository.save(deviceId, measurement2), 0);
+
+    const domain::DeviceId otherDevice{"deye-002"};
+
+    ASSERT_NE(repository.save(otherDevice, measurement1), 0);
+
+    const auto records = repository.findByDevice(deviceId, 100);
+
+    ASSERT_EQ(records.size(), 2);
+
+    EXPECT_EQ(records[0].deviceId.value, "deye-001");
+    EXPECT_DOUBLE_EQ(records[0].measurement.pvPower, 2000.0);
+    EXPECT_DOUBLE_EQ(records[0].measurement.batterySoc, 71.0);
+
+    EXPECT_EQ(records[1].deviceId.value, "deye-001");
+    EXPECT_DOUBLE_EQ(records[1].measurement.pvPower, 1000.0);
+    EXPECT_DOUBLE_EQ(records[1].measurement.batterySoc, 70.0);
+
+    const auto rollbackResult = connection.execute("ROLLBACK");
+
+    ASSERT_TRUE(rollbackResult.isOk())
+        << "Failed to rollback transaction";
+}
