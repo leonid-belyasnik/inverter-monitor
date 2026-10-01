@@ -46,3 +46,18 @@ add_test(
     NAME TelemetryAdapterTest
     COMMAND telemetry_adapter_test
 )
+
+add_executable(http_router_test
+    HttpRouterTest.cpp
+)
+
+target_link_libraries(http_router_test
+    PRIVATE
+        api
+        GTest::gtest_main
+)
+
+add_test(
+    NAME HttpRouterTest
+    COMMAND http_router_test
+)
