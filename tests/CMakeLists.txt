@@ -61,3 +61,20 @@ add_test(
     NAME HttpRouterTest
     COMMAND http_router_test
 )
+
+add_executable(api_routes_test
+    ApiRoutesTest.cpp
+)
+
+target_link_libraries(api_routes_test
+    PRIVATE
+        api
+        application
+        database
+        GTest::gtest_main
+)
+
+add_test(
+    NAME ApiRoutesTest
+    COMMAND api_routes_test
+)
