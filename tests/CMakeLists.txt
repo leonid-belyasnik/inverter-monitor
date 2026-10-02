@@ -78,3 +78,12 @@ add_test(
     NAME ApiRoutesTest
     COMMAND api_routes_test
 )
+
+add_executable(websocket_client
+    WebSocketClient.cpp
+)
+
+target_link_libraries(websocket_client
+    PRIVATE
+        Boost::headers
+)

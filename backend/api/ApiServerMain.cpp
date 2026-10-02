@@ -7,6 +7,7 @@
 #include "ApiRoutes.h"
 #include "HttpRouter.h"
 #include "HttpServer.h"
+#include "WebSocketServer.h"
 
 int main()
 {
@@ -39,5 +40,11 @@ int main()
         8080,
         router);
 
-    server.run();
+    api::WebSocketServer webSocketServer(
+        "0.0.0.0",
+        8081);
+
+    // server.run();
+
+    webSocketServer.run();
 }

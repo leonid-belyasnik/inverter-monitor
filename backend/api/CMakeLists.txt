@@ -2,6 +2,9 @@ add_library(api STATIC
     ApiRoutes.cpp
     HttpRouter.cpp
     HttpServer.cpp
+    WebSocketServer.cpp
+    WebSocketSession.cpp
+    WebSocketProtocol.cpp
 )
 
 target_include_directories(api
