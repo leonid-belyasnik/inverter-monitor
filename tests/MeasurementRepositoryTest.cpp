@@ -30,7 +30,14 @@ TEST(MeasurementRepositoryTest, IngestsAndPersistsMeasurementWithDeviceId)
         << "Failed to begin transaction";
 
     database::MeasurementRepository repository(connection);
-    application::TelemetryIngestionService ingestion(repository);
+    bool handlerCalled = false;
+
+    application::TelemetryIngestionService ingestion(
+        repository,
+        [&handlerCalled](const application::IngestedMeasurement &)
+        {
+            handlerCalled = true;
+        });
     const protocol::TelemetryParser parser;
     const mqtt::TelemetryAdapter adapter(parser);
 
@@ -54,6 +61,8 @@ TEST(MeasurementRepositoryTest, IngestsAndPersistsMeasurementWithDeviceId)
     ASSERT_TRUE(ingested.has_value());
 
     const auto measurementId = ingestion.ingest(*ingested);
+
+    EXPECT_TRUE(handlerCalled);
 
     ASSERT_TRUE(measurementId.has_value())
         << "Failed to ingest measurement";

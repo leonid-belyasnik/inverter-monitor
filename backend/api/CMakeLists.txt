@@ -1,4 +1,5 @@
 add_library(api STATIC
+    ApiFormatting.cpp
     ApiRoutes.cpp
     HttpRouter.cpp
     HttpServer.cpp

@@ -6,38 +6,32 @@
 
 int main()
 {
-    boost::asio::io_context ioContext;
+	boost::asio::io_context ioContext;
 
-    boost::asio::ip::tcp::resolver resolver(ioContext);
-    boost::beast::websocket::stream<
-        boost::asio::ip::tcp::socket
-    > websocket(ioContext);
+	boost::asio::ip::tcp::resolver resolver(ioContext);
+	boost::beast::websocket::stream<boost::asio::ip::tcp::socket> websocket(ioContext);
 
-    const auto endpoints = resolver.resolve(
-        "localhost",
-        "8081");
+	const auto endpoints = resolver.resolve("localhost", "8081");
 
-    boost::asio::connect(
-        websocket.next_layer(),
-        endpoints);
+	boost::asio::connect(websocket.next_layer(), endpoints);
 
-    websocket.handshake(
-        "localhost",
-        "/");
+	websocket.handshake("localhost", "/");
 
-    websocket.write(
-    boost::asio::buffer(
-        R"({"type":"subscribe","device_id":"simulator-001"})"));
+	const std::string message = R"({"type":"subscribe","device_id":"simulator-001"})";
 
-    boost::beast::flat_buffer buffer;
+	websocket.write(boost::asio::buffer(message));
 
-    websocket.read(buffer);
+	boost::beast::flat_buffer buffer;
 
-    std::cout
-        << boost::beast::buffers_to_string(
-               buffer.data())
-        << '\n';
+	websocket.read(buffer);
 
-    websocket.close(
-        boost::beast::websocket::close_code::normal);
+	std::cout << boost::beast::buffers_to_string(buffer.data()) << '\n';
+
+	buffer.consume(buffer.size());
+
+	websocket.read(buffer);
+
+	std::cout << boost::beast::buffers_to_string(buffer.data()) << '\n';
+
+	websocket.close(boost::beast::websocket::close_code::normal);
 }

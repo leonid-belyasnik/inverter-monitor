@@ -12,6 +12,7 @@ target_sources(inverter-monitor
 
 target_link_libraries(inverter-monitor
     PRIVATE
+        api
         application
         database
         mqtt

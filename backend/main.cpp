@@ -4,6 +4,7 @@
 #include <string>
 #include <thread>
 
+#include <api/WebSocketServer.h>
 #include <application/TelemetryIngestionService.h>
 #include <database/DatabaseSchema.h>
 #include <database/MeasurementRepository.h>
@@ -12,142 +13,116 @@
 #include <mqtt/TelemetryAdapter.h>
 #include <protocol/TelemetryParser.h>
 
-namespace
+namespace {
+
+std::string getEnvironment(const char *name, const std::string &defaultValue)
 {
+	const char *value = std::getenv(name);
 
-std::string getEnvironment(
-const char* name,
-const std::string& defaultValue)
+	return value ? value : defaultValue;
+}
+
+int getEnvironmentInt(const char *name, const int defaultValue)
 {
-const char* value = std::getenv(name);
+	const char *value = std::getenv(name);
 
-return value ? value : defaultValue;
+	if (!value) {
+		return defaultValue;
+	}
 
+	try {
+		return std::stoi(value);
+	} catch (...) {
+		return defaultValue;
+	}
 }
 
-int getEnvironmentInt(
-const char* name,
-const int defaultValue)
-{
-const char* value = std::getenv(name);
-
-if (!value) {
-    return defaultValue;
-}
-
-try {
-    return std::stoi(value);
-} catch (...) {
-    return defaultValue;
-}
-
-}
-
-}
+} // namespace
 
 int main()
 {
-const std::string mqttHost =
-getEnvironment("MQTT_HOST", "localhost");
+	const std::string mqttHost = getEnvironment("MQTT_HOST", "localhost");
 
-const int mqttPort =
-    getEnvironmentInt("MQTT_PORT", 1883);
+	const int mqttPort = getEnvironmentInt("MQTT_PORT", 1883);
 
-database::PostgresConnection databaseConnection("");
+	database::PostgresConnection databaseConnection("");
 
-if (!databaseConnection.isOk()) {
-    std::cerr
-        << "Database connection failed: "
-        << databaseConnection.errorMessage()
-        << '\n';
-    return 1;
-}
+	if (!databaseConnection.isOk()) {
+		std::cerr << "Database connection failed: " << databaseConnection.errorMessage() << '\n';
+		return 1;
+	}
 
-database::DatabaseSchema schema(databaseConnection);
+	database::DatabaseSchema schema(databaseConnection);
 
-if (!schema.initialize()) {
-    std::cerr << "Database schema initialization failed\n";
-    return 1;
-}
+	if (!schema.initialize()) {
+		std::cerr << "Database schema initialization failed\n";
+		return 1;
+	}
 
-database::MeasurementRepository repository(databaseConnection);
-application::TelemetryIngestionService ingestion(repository);
-protocol::TelemetryParser parser;
-mqtt::TelemetryAdapter telemetryAdapter(parser);
+	database::MeasurementRepository repository(databaseConnection);
 
-std::cout
-    << "Starting inverter-monitor\n"
-    << "MQTT broker: "
-    << mqttHost << ':' << mqttPort
-    << '\n';
+	api::WebSocketServer webSocketServer("0.0.0.0", 8081);
 
-mqtt::MqttClient mqtt(
-    "inverter-monitor-backend",
-    mqttHost,
-    mqttPort,
-    [&telemetryAdapter, &ingestion](const std::string_view topic,
-                                    const std::string_view payload)
-    {
-        const auto measurement = telemetryAdapter.adapt(topic, payload);
+	application::TelemetryIngestionService ingestion(
+	    repository, [&webSocketServer](const application::IngestedMeasurement &measurement) {
+		    webSocketServer.publish(measurement);
+	    });
 
-        if (!measurement) {
-            std::cerr << "Invalid telemetry topic or payload\n";
-            return;
-        }
+	protocol::TelemetryParser parser;
+	mqtt::TelemetryAdapter telemetryAdapter(parser);
 
-        const auto measurementId = ingestion.ingest(*measurement);
+	std::thread webSocketThread([&webSocketServer] { webSocketServer.run(); });
 
-        if (!measurementId) {
-            std::cerr
-                << "Failed to persist telemetry for device "
-                << measurement->deviceId.value
-                << '\n';
-            return;
-        }
+	std::cout << "Starting inverter-monitor\n"
+	          << "MQTT broker: " << mqttHost << ':' << mqttPort << '\n';
 
-        std::cout
-            << "Persisted telemetry for device "
-            << measurement->deviceId.value
-            << " as measurement " << *measurementId
-            << '\n';
-    });
+	mqtt::MqttClient mqtt("inverter-monitor-backend", mqttHost, mqttPort,
+	                      [&telemetryAdapter, &ingestion](const std::string_view topic,
+	                                                      const std::string_view payload) {
+		                      const auto measurement = telemetryAdapter.adapt(topic, payload);
 
-if (!mqtt.connect()) {
-    std::cerr
-        << "MQTT connection failed: "
-        << mqtt.errorMessage()
-        << '\n';
+		                      if (!measurement) {
+			                      std::cerr << "Invalid telemetry topic or payload\n";
+			                      return;
+		                      }
 
-    return 1;
-}
+		                      const auto measurementId = ingestion.ingest(*measurement);
 
-if (!mqtt.subscribe("v1/devices/+/telemetry")) {
-    std::cerr
-        << "MQTT subscribe failed: "
-        << mqtt.errorMessage()
-        << '\n';
+		                      if (!measurementId) {
+			                      std::cerr << "Failed to persist telemetry for device "
+			                                << measurement->deviceId.value << '\n';
+			                      return;
+		                      }
 
-    return 1;
-}
+		                      std::cout << "Persisted telemetry for device "
+		                                << measurement->deviceId.value << " as measurement "
+		                                << *measurementId << '\n';
+	                      });
 
-if (!mqtt.startLoop()) {
-    std::cerr
-        << "MQTT loop start failed: "
-        << mqtt.errorMessage()
-        << '\n';
+	if (!mqtt.connect()) {
+		std::cerr << "MQTT connection failed: " << mqtt.errorMessage() << '\n';
 
-    return 1;
-}
+		return 1;
+	}
 
-std::cout
-    << "MQTT client is running\n"
-    << "Waiting for telemetry...\n";
+	if (!mqtt.subscribe("v1/devices/+/telemetry")) {
+		std::cerr << "MQTT subscribe failed: " << mqtt.errorMessage() << '\n';
 
-while (true) {
-    std::this_thread::sleep_for(
-        std::chrono::seconds(1));
-}
+		return 1;
+	}
 
-return 0;
+	if (!mqtt.startLoop()) {
+		std::cerr << "MQTT loop start failed: " << mqtt.errorMessage() << '\n';
 
+		return 1;
+	}
+
+	std::cout << "MQTT client is running\n"
+	          << "Waiting for telemetry...\n";
+
+	while (true) {
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
+
+	return 0;
 }
