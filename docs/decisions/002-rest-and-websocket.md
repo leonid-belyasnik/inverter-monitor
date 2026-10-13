@@ -26,22 +26,20 @@ The WebSocket server uses its own Boost.Asio `io_context`, running in a dedicate
 
 ## Current Implementation Status
 
-The REST routes and HTTP server implementation exist, but the HTTP server is not currently started by the running executables.
+At the time this decision was recorded, the REST routes and HTTP server existed but were not started by the main runtime. The current `inverter-monitor` runtime now starts REST HTTP on port `8080` and WebSocket on port `8081`.
 
-The `inverter-monitor` executable starts the MQTT ingestion flow and WebSocket server. The `api-server` executable is intended for isolated API development and testing, but its HTTP server `run()` call is currently disabled. It currently starts the WebSocket server only.
+The `api-server` executable remains a separate development executable: its HTTP server `run()` call is disabled, and it starts only the WebSocket server.
 
-Consequently, the WebSocket interface is currently exposed on port `8081`, while the REST endpoints are not accessible through the running executables.
-
-This is an implementation status, not a change to the architectural decision.
+This implementation-status update does not change the architectural decision.
 
 ## Consequences
 
 * REST and WebSocket have distinct responsibilities.
-* Historical measurements can be queried through the REST API once the HTTP server is enabled.
+* Historical measurements can be queried through REST on the main runtime's port `8080`.
 * Real-time measurements are delivered through WebSocket subscriptions.
 * The application ingestion flow remains the integration point between MQTT, persistence, and real-time publication.
 * WebSocket network operations are separated from the MQTT communication path.
-* The HTTP server must be enabled in the appropriate runtime before REST endpoints can be used.
+* The main runtime exposes both interfaces; the development `api-server` still requires HTTP to be enabled if REST access is needed there.
 
 ## Alternatives Considered
 

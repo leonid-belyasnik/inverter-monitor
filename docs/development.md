@@ -82,11 +82,13 @@ Telemetry Simulator
         +------> PostgreSQL
         |
         +------> WebSocket Clients
+        |
+        +------> REST Clients
 ```
 
 A successful check confirms that telemetry can be received, parsed, persisted, and delivered to subscribed WebSocket clients.
 
-The REST HTTP server is not currently started by the runtime executables. Do not treat REST endpoint availability as part of a successful runtime check until the HTTP server has been enabled.
+The main `inverter-monitor` runtime starts REST HTTP on port `8080` and WebSocket on port `8081`. The separate `api-server` development executable still does not run its HTTP server. A successful runtime check for `inverter-monitor` can include REST endpoint availability as well as telemetry delivery to WebSocket clients.
 
 ## Code Formatting
 
