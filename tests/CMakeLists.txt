@@ -79,6 +79,21 @@ add_test(
     COMMAND api_routes_test
 )
 
+add_executable(http_server_test
+    HttpServerTest.cpp
+)
+
+target_link_libraries(http_server_test
+    PRIVATE
+        api
+        GTest::gtest_main
+)
+
+add_test(
+    NAME HttpServerTest
+    COMMAND http_server_test
+)
+
 add_executable(websocket_client
     WebSocketClient.cpp
 )

@@ -105,7 +105,7 @@ The implemented REST functionality includes:
 
 The WebSocket API provides real-time telemetry updates to subscribed clients.
 
-**Current runtime status:** the WebSocket server is started by `inverter-monitor` and listens on port `8081`. REST route and HTTP server code exists, but the HTTP server is not currently started by `inverter-monitor`. In `api-server`, the HTTP server's `run()` call is currently disabled. Therefore, the REST endpoints are implemented but are not currently exposed by the running executables.
+**Current runtime status:** `inverter-monitor` starts the HTTP REST server on port `8080` and the WebSocket server on port `8081`. The HTTP server binds before the service threads start, so a bind failure is reported during startup. Both servers run in separate threads and are stopped when the process receives SIGINT or SIGTERM. `api-server` remains an API development executable; its HTTP `run()` call is disabled.
 
 ## Data Flow
 
@@ -128,7 +128,7 @@ The implemented REST query flow is:
 3. The repository retrieves matching measurements from PostgreSQL.
 4. The API layer serializes the results into a JSON response.
 
-This flow describes implemented REST functionality; the HTTP server is not currently started by the runtime executables.
+The HTTP server exposes this flow from `inverter-monitor` on port `8080`.
 
 ### WebSocket Subscription
 
@@ -176,12 +176,12 @@ The main runtime executable initializes the database, repository, WebSocket serv
 
 It is responsible for the MQTT-to-database and MQTT-to-WebSocket telemetry flow.
 
-The HTTP REST server is not currently started by this executable.
+The HTTP REST server is started on port `8080` in its own thread.
 
 ### `api-server`
 
 This executable is intended for isolated API development and testing.
 
-The HTTP server's `run()` call is currently disabled, so the executable does not currently expose the REST endpoints. The WebSocket server is started.
+The HTTP server's `run()` call is currently disabled in this development executable. The production `inverter-monitor` executable starts HTTP on port `8080` and WebSocket on port `8081`.
 
-Neither executable currently provides a running HTTP REST endpoint.
+The `inverter-monitor` executable provides the running HTTP REST endpoint.

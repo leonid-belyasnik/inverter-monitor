@@ -26,6 +26,11 @@ void WebSocketServer::run()
 	m_ioContext.run();
 }
 
+void WebSocketServer::stop()
+{
+	m_ioContext.stop();
+}
+
 void WebSocketServer::publish(const application::IngestedMeasurement &measurement)
 {
 	boost::asio::post(m_ioContext, [this, measurement] { publishOnContext(measurement); });

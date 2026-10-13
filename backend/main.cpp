@@ -1,10 +1,18 @@
 #include <chrono>
+#include <csignal>
 #include <cstdlib>
+#include <atomic>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <thread>
+#include <exception>
 
+#include <api/ApiRoutes.h>
+#include <api/HttpRouter.h>
+#include <api/HttpServer.h>
 #include <api/WebSocketServer.h>
+#include <application/MeasurementQueryService.h>
 #include <application/TelemetryIngestionService.h>
 #include <database/DatabaseSchema.h>
 #include <database/MeasurementRepository.h>
@@ -14,6 +22,13 @@
 #include <protocol/TelemetryParser.h>
 
 namespace {
+
+volatile std::sig_atomic_t stopRequested = 0;
+
+void handleSignal(int)
+{
+	stopRequested = 1;
+}
 
 std::string getEnvironment(const char *name, const std::string &defaultValue)
 {
@@ -60,18 +75,76 @@ int main()
 	}
 
 	database::MeasurementRepository repository(databaseConnection);
+	application::MeasurementQueryService queryService(repository);
+	api::HttpRouter httpRouter;
+	api::ApiRoutes::registerRoutes(httpRouter, queryService);
 
-	api::WebSocketServer webSocketServer("0.0.0.0", 8081);
+	std::unique_ptr<api::HttpServer> httpServer;
+	try {
+		httpServer = std::make_unique<api::HttpServer>("0.0.0.0", 8080, httpRouter);
+		httpServer->listen();
+	} catch (const std::exception& error) {
+		std::cerr << "HTTP server startup failed on port 8080: " << error.what() << '\n';
+		return 1;
+	}
+
+	std::unique_ptr<api::WebSocketServer> webSocketServer;
+	try {
+		webSocketServer = std::make_unique<api::WebSocketServer>("0.0.0.0", 8081);
+	} catch (const std::exception& error) {
+		std::cerr << "WebSocket server startup failed on port 8081: " << error.what() << '\n';
+		return 1;
+	}
 
 	application::TelemetryIngestionService ingestion(
 	    repository, [&webSocketServer](const application::IngestedMeasurement &measurement) {
-		    webSocketServer.publish(measurement);
+		    webSocketServer->publish(measurement);
 	    });
 
 	protocol::TelemetryParser parser;
 	mqtt::TelemetryAdapter telemetryAdapter(parser);
 
-	std::thread webSocketThread([&webSocketServer] { webSocketServer.run(); });
+	std::atomic_bool httpThreadFailed{false};
+	std::atomic_bool webSocketThreadFailed{false};
+	std::thread httpThread([&httpServer, &httpThreadFailed] {
+		try {
+			httpServer->run();
+		} catch (const std::exception& error) {
+			std::cerr << "HTTP server failed: " << error.what() << '\n';
+			httpThreadFailed = true;
+		} catch (...) {
+			std::cerr << "HTTP server failed with an unknown error\n";
+			httpThreadFailed = true;
+		}
+	});
+	std::thread webSocketThread;
+	try {
+		webSocketThread = std::thread([&webSocketServer, &webSocketThreadFailed] {
+			try {
+				webSocketServer->run();
+			} catch (const std::exception& error) {
+				std::cerr << "WebSocket server failed: " << error.what() << '\n';
+				webSocketThreadFailed = true;
+			} catch (...) {
+				std::cerr << "WebSocket server failed with an unknown error\n";
+				webSocketThreadFailed = true;
+			}
+		});
+	} catch (const std::exception& error) {
+		std::cerr << "WebSocket server thread startup failed: " << error.what() << '\n';
+		httpServer->stop();
+		httpThread.join();
+		return 1;
+	}
+	auto stopServers = [&] {
+		httpServer->stop();
+		webSocketServer->stop();
+		if (httpThread.joinable()) httpThread.join();
+		if (webSocketThread.joinable()) webSocketThread.join();
+	};
+
+	std::signal(SIGINT, handleSignal);
+	std::signal(SIGTERM, handleSignal);
 
 	std::cout << "Starting inverter-monitor\n"
 	          << "MQTT broker: " << mqttHost << ':' << mqttPort << '\n';
@@ -101,18 +174,21 @@ int main()
 
 	if (!mqtt.connect()) {
 		std::cerr << "MQTT connection failed: " << mqtt.errorMessage() << '\n';
+		stopServers();
 
 		return 1;
 	}
 
 	if (!mqtt.subscribe("v1/devices/+/telemetry")) {
 		std::cerr << "MQTT subscribe failed: " << mqtt.errorMessage() << '\n';
+		stopServers();
 
 		return 1;
 	}
 
 	if (!mqtt.startLoop()) {
 		std::cerr << "MQTT loop start failed: " << mqtt.errorMessage() << '\n';
+		stopServers();
 
 		return 1;
 	}
@@ -120,9 +196,12 @@ int main()
 	std::cout << "MQTT client is running\n"
 	          << "Waiting for telemetry...\n";
 
-	while (true) {
+	while (!stopRequested && !httpThreadFailed && !webSocketThreadFailed) {
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
 
-	return 0;
+	mqtt.stopLoop();
+	stopServers();
+
+	return (httpThreadFailed || webSocketThreadFailed) ? 1 : 0;
 }

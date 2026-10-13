@@ -19,6 +19,7 @@ class WebSocketServer
 	WebSocketServer(const char *address, unsigned short port);
 
 	void run();
+	void stop();
 
 	void publish(const application::IngestedMeasurement &measurement);
 

@@ -20,6 +20,7 @@ PostgresConnection::PostgresConnection(const char* connectionString)
 
 bool PostgresConnection::isOk() const
 {
+    std::lock_guard lock(m_mutex);
     return m_connection && PQstatus(m_connection.get()) == CONNECTION_OK;
 }
 
@@ -30,6 +31,7 @@ const char* PostgresConnection::errorMessage() const
 
 PostgresResult PostgresConnection::execute(const char* query) const
 {
+    std::lock_guard lock(m_mutex);
     return PostgresResult(PQexec(m_connection.get(), query));
 }
 
@@ -39,6 +41,7 @@ PostgresResult PostgresConnection::executeParams(
     const char* const* parameters
 ) const
 {
+    std::lock_guard lock(m_mutex);
     return PostgresResult(
         PQexecParams(
             m_connection.get(),

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 
 struct pg_conn;
 
@@ -34,6 +35,7 @@ private:
     using ConnectionPtr = std::unique_ptr<PGconn, ConnectionDeleter>;
 
     ConnectionPtr m_connection;
+    mutable std::mutex m_mutex;
 };
 
 } // namespace database

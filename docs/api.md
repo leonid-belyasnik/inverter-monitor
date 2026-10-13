@@ -7,10 +7,10 @@ The API layer contains REST HTTP and WebSocket interfaces for accessing inverter
 **Current runtime status:**
 
 * WebSocket server is started by `inverter-monitor` and listens on port `8081`.
-* REST routes and HTTP server code are implemented, but the HTTP server is not currently started by the running executables.
-* The `api-server` executable currently starts the WebSocket server only; its HTTP server `run()` call is disabled.
+* `inverter-monitor` starts the HTTP server on port `8080` and WebSocket server on port `8081`.
+* The `api-server` development executable currently starts the WebSocket server only; its HTTP server `run()` call is disabled.
 
-Therefore, REST endpoints described below document the implemented API contract, but they are not currently accessible through the running executables.
+REST endpoints described below are available from the running `inverter-monitor` executable.
 
 ## REST API
 
@@ -20,7 +20,7 @@ Therefore, REST endpoints described below document the implemented API contract,
 
 The health endpoint is implemented in the REST API code.
 
-The HTTP server is not currently running, so this endpoint cannot currently be accessed through the application runtime.
+The endpoint is available on `http://localhost:8080/api/v1/health` when `inverter-monitor` is running.
 
 ### Get Device Measurements
 
@@ -146,6 +146,6 @@ Timestamps use ISO 8601 UTC format.
 
 ## Current Limitations
 
-* The REST implementation is not currently exposed by the running executables because the HTTP server is not started.
+* HTTP is exposed by `inverter-monitor` on port `8080`.
 * The WebSocket API is available on port `8081`.
 * The API currently provides device-specific measurement access and real-time subscription rather than a general-purpose device management interface.
