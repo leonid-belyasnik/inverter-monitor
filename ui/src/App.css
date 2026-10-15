@@ -94,6 +94,17 @@
   white-space: nowrap;
 }
 
+.connection-pill.connected {
+  border-color: #d4e7d8;
+  background: #f2faf3;
+  color: #3c7650;
+}
+
+.connection-pill.connected .connection-dot {
+  background: #5c9d70;
+  box-shadow: 0 0 0 3px #e0f0e3;
+}
+
 .connection-dot {
   width: 8px;
   height: 8px;
@@ -137,6 +148,18 @@ main {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.source-label {
+  margin: 8px 0 0;
+  color: #637469;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.source-label span {
+  padding: 0 4px;
+  color: #9ca69c;
 }
 
 .data-state-card {
@@ -186,6 +209,11 @@ main {
   color: var(--ink);
   font-size: 13px;
   font-weight: 650;
+}
+
+.timestamp-item strong {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .metrics-grid {
@@ -268,10 +296,17 @@ main {
   font-size: 10px;
 }
 
+.metric-time {
+  margin: 7px 0 0;
+  color: #7d877e;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .timestamps-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
   align-items: center;
-  justify-content: space-between;
   gap: 28px;
   margin-top: 18px;
   padding: 17px 20px;
@@ -301,10 +336,55 @@ main {
 }
 
 .timestamp-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  min-width: 0;
+  padding-right: 3px;
+}
+
+.timestamp-item {
+  min-width: 0;
+}
+
+.request-message {
+  margin: 14px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.request-error {
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding-right: 3px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 13px 16px;
+  border: 1px solid #f0d9d2;
+  border-radius: 12px;
+  background: #fff8f5;
+  color: #8d4938;
+  font-size: 12px;
+}
+
+.request-error p {
+  margin: 0;
+}
+
+.request-error button {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border: 1px solid #d9a99d;
+  border-radius: 8px;
+  background: white;
+  color: #814536;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.request-error button:hover {
+  background: #fff0eb;
 }
 
 .timestamp-divider {
@@ -394,6 +474,10 @@ main {
   .metric-card {
     min-height: 184px;
   }
+
+  .timestamps-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 620px) {
@@ -457,6 +541,10 @@ main {
     font-size: 12px;
   }
 
+  .source-label {
+    font-size: 11px;
+  }
+
   .data-state-card {
     width: 100%;
     box-sizing: border-box;
@@ -493,16 +581,13 @@ main {
   }
 
   .timestamps-card {
-    align-items: stretch;
-    flex-direction: column;
     gap: 16px;
     padding: 15px;
   }
 
   .timestamp-values {
-    justify-content: space-between;
     gap: 12px;
-    padding: 12px 0 0 50px;
+    padding: 12px 0 0;
     border-top: 1px solid var(--line);
   }
 
@@ -534,6 +619,11 @@ main {
   .page-footer {
     flex-direction: column;
     gap: 4px;
+  }
+
+  .request-error {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

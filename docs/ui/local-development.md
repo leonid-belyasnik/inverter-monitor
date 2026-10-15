@@ -28,6 +28,8 @@ Start the client data flow in this order:
 
 The subscription has no initial snapshot. Merge REST history and WebSocket measurements by parsed `measured_at` so a REST result cannot replace a newer WebSocket measurement in the latest-value display. The API has no stable measurement ID: if two records have the same `measured_at`, the client cannot reliably tell whether they are the same record or distinct measurements. The implementation must choose and document a tie policy; preferring the WebSocket value for the live display does not prove the records are identical for history. See [Telemetry and Freshness](telemetry-and-freshness.md) for payload and timestamp details.
 
+The current REST-only overview selects the record with the greatest parsed `measured_at`. If multiple records tie, it keeps the first matching record in the API response order (currently newest-first). This tie policy does not identify duplicate records.
+
 ## Frontend Development Flow
 
 During implementation, run the Vite development server on the development computer with a LAN bind, for example:
