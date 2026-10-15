@@ -26,12 +26,14 @@ FROM ubuntu:24.04 AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpq5 \
+        libboost-json1.83.0 \
+        libmosquitto1 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /usr/sbin/nologin app
 
 WORKDIR /app
 
-COPY --from=build /app/build/src/inverter-monitor /usr/local/bin/inverter-monitor
+COPY --from=build /app/build/backend/inverter-monitor /usr/local/bin/inverter-monitor
 
 USER app
 
