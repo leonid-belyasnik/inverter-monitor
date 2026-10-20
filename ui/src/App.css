@@ -424,6 +424,177 @@ main {
   font-weight: 550;
 }
 
+.history-charts {
+  display: grid;
+  gap: 20px;
+}
+
+.history-note {
+  margin: 0;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f9faf7;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.chart-block {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.chart-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.chart-subtitle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.chart-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chart-y-axis {
+  position: relative;
+  flex: 0 0 40px;
+  width: 40px;
+}
+
+.chart-svg-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.history-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-x-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chart-x-axis-spacer {
+  flex: 0 0 40px;
+  width: 40px;
+}
+
+.chart-x-axis {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 14px;
+}
+
+.chart-grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart-zero-line {
+  stroke: #9ca69c;
+  stroke-width: 1.2;
+}
+
+.chart-line {
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Axis labels are plain HTML text positioned over the chart, not SVG text,
+   so their font-size stays fixed in real pixels regardless of how much the
+   SVG viewBox is scaled down on narrow (e.g. ~300px) mobile containers. */
+.chart-axis-label {
+  position: absolute;
+  overflow: hidden;
+  color: #767e73;
+  font-size: 10px;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chart-y-axis .chart-axis-label {
+  right: 0;
+  left: 0;
+  text-align: right;
+  transform: translateY(-50%);
+}
+
+.chart-x-axis .chart-axis-label {
+  top: 0;
+  max-width: 64px;
+}
+
+/* Leftmost label: left-aligned so its text grows rightward from the start
+   of the time range instead of spilling past the left edge of the chart. */
+.chart-x-axis .chart-axis-label--start {
+  text-align: left;
+}
+
+/* Rightmost label: right-aligned so its text grows leftward from the end of
+   the time range instead of spilling past the right edge of the chart. */
+.chart-x-axis .chart-axis-label--end {
+  text-align: right;
+  transform: translateX(-100%);
+}
+
+/* A single centered label (e.g. the midpoint, or the only label left after
+   dropping duplicates) stays centered on its position, same as before. */
+.chart-x-axis .chart-axis-label--middle {
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.chart-empty {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
 .history-empty {
   min-height: 208px;
   display: flex;
@@ -614,6 +785,14 @@ main {
 
   .history-empty {
     min-height: 180px;
+  }
+
+  .chart-block {
+    padding: 14px 14px;
+  }
+
+  .chart-legend {
+    gap: 10px;
   }
 
   .page-footer {

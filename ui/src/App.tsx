@@ -1,6 +1,7 @@
 import './App.css'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deviceConfig, sourceLabel } from './deviceConfig'
+import { PowerHistoryChart, SocHistoryChart } from './HistoryCharts'
 
 type IconName = 'grid' | 'battery' | 'solar' | 'home' | 'clock' | 'history'
 
@@ -33,6 +34,8 @@ function Icon({ name }: { name: IconName }) {
 type Measurement = {
   measured_at: string
   pv_power: number | null
+  grid_power: number | null
+  battery_power: number | null
   load_power: number | null
   battery_soc: number | null
 }
@@ -72,6 +75,9 @@ type ApiState =
   | { status: 'success'; measurements: Measurement[] }
 
 type MetricKey = 'battery_soc' | 'pv_power' | 'load_power'
+type MeasurementKey = MetricKey | 'grid_power' | 'battery_power'
+
+const HISTORY_LIMIT = 100
 
 const metrics: {
   title: string
@@ -135,7 +141,7 @@ function parseMeasurements(payload: unknown): Measurement[] {
       throw new Error(`У измерения №${index + 1} отсутствует корректное время.`)
     }
 
-    const readValue = (key: MetricKey): number | null => {
+    const readValue = (key: MeasurementKey): number | null => {
       const field = record[key]
       if (field === undefined || field === null) return null
       if (typeof field !== 'number' || !Number.isFinite(field)) {
@@ -148,6 +154,8 @@ function parseMeasurements(payload: unknown): Measurement[] {
       measured_at: record.measured_at,
       battery_soc: readValue('battery_soc'),
       pv_power: readValue('pv_power'),
+      grid_power: readValue('grid_power'),
+      battery_power: readValue('battery_power'),
       load_power: readValue('load_power'),
     }
   })
@@ -179,7 +187,7 @@ function App() {
   const requestMeasurements = useCallback(async (): Promise<ApiState> => {
     try {
       const response = await fetch(
-        `/api/v1/devices/${encodeURIComponent(deviceConfig.deviceId)}/measurements`,
+        `/api/v1/devices/${encodeURIComponent(deviceConfig.deviceId)}/measurements?limit=${HISTORY_LIMIT}`,
       )
       if (!response.ok) {
         throw new Error(`Не удалось загрузить измерения (HTTP ${response.status}).`)
@@ -426,15 +434,26 @@ function App() {
             </div>
             <span className="history-period">{apiState.status === 'success' ? `Записей: ${apiState.measurements.length}` : 'Последние измерения'}</span>
           </div>
-          <div className="history-empty">
-            <span className="empty-icon"><Icon name="history" /></span>
-            <h3>{apiState.status === 'success' && apiState.measurements.length > 0 ? 'Измерения загружены' : apiState.status === 'loading' ? 'Загружаем историю' : 'История измерений'}</h3>
-            <p>{apiState.status === 'success' && apiState.measurements.length > 0
-              ? `Получено ${apiState.measurements.length} записей. Графики пока не отображаются.`
-              : apiState.status === 'error'
+          {apiState.status === 'success' && apiState.measurements.length > 0 ? (
+            <div className="history-charts">
+              <p className="history-note">
+                Показано {apiState.measurements.length} из последних {HISTORY_LIMIT} записей, доступных по этому запросу —
+                более старые измерения в выборку не входят. История построена по данным, загруженным по REST при открытии
+                страницы, и не обновляется автоматически; новые измерения по WebSocket видны выше, в карточках и во
+                времени обновления, но в эту историю не добавляются без обновления страницы.
+              </p>
+              <PowerHistoryChart measurements={apiState.measurements} />
+              <SocHistoryChart measurements={apiState.measurements} />
+            </div>
+          ) : (
+            <div className="history-empty">
+              <span className="empty-icon"><Icon name="history" /></span>
+              <h3>{apiState.status === 'loading' ? 'Загружаем историю' : apiState.status === 'error' ? 'История недоступна' : 'История измерений'}</h3>
+              <p>{apiState.status === 'error'
                 ? 'Не удалось получить записи истории.'
                 : 'История появится здесь, когда будут доступны измерения.'}</p>
-          </div>
+            </div>
+          )}
         </section>
       </main>
 
