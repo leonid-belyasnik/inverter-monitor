@@ -1,134 +1,161 @@
 #include <Arduino.h>
+#include <WiFiClient.h>
+
+#include "Config.h"
+#include "ModbusClient.h"
+#include "RegisterMap.h"
+#include "TelemetryPublisher.h"
+#include "TimeSync.h"
+#include "secrets.h"
 
 namespace {
-constexpr int RS485_TX_PIN = 17;
-constexpr int RS485_RX_PIN = 18;
-constexpr int RS485_DE_PIN = 21;
 
-constexpr uint32_t MODBUS_BAUD = 9600;
-constexpr uint8_t MODBUS_SLAVE_ID = 1;
-constexpr uint16_t TEST_REGISTER = 0;
+modbus::ModbusClient modbusClient(Serial1, config::MODBUS_SLAVE_ID, config::RS485_DE_PIN);
 
-constexpr uint32_t RESPONSE_TIMEOUT_MS = 500;
+WiFiClient wifiClient;
+telemetry::TelemetryPublisher publisher(wifiClient, secrets::DEVICE_ID);
 
-uint16_t modbusCrc16(const uint8_t *data, size_t length)
+uint32_t lastTelemetryMs = 0;
+uint32_t lastDiagnosticMs = 0;
+uint32_t lastSkipLogMs = 0;
+bool firstCycle = true;
+
+// Reads one register and pauses for the inter-frame gap. Failures are logged
+// and reported through the result status; no previous value is reused.
+modbus::ReadResult readRegister(uint16_t address, const char* label)
 {
-	uint16_t crc = 0xFFFF;
+    const modbus::ReadResult result = modbusClient.readHoldingRegister(address);
+    delay(config::MODBUS_INTER_FRAME_DELAY_MS);
 
-	for (size_t i = 0; i < length; ++i) {
-		crc ^= data[i];
+    if (result.status == modbus::ReadStatus::ExceptionResponse) {
+        Serial.printf("%s (reg %u): modbus exception 0x%02X\n",
+                      label, address, result.exceptionCode);
+    } else if (result.status != modbus::ReadStatus::Ok) {
+        Serial.printf("%s (reg %u): %s\n",
+                      label, address, modbus::toString(result.status));
+    }
 
-		for (int bit = 0; bit < 8; ++bit) {
-			if (crc & 1) {
-				crc = (crc >> 1) ^ 0xA001;
-			} else {
-				crc >>= 1;
-			}
-		}
-	}
-
-	return crc;
+    return result;
 }
 
-void printBytes(const char *label, const uint8_t *data, size_t length)
+bool readSignedPower(uint16_t address, const char* label, double& watts)
 {
-	Serial.print(label);
+    const modbus::ReadResult result = readRegister(address, label);
 
-	for (size_t i = 0; i < length; ++i) {
-		Serial.printf(" %02X", data[i]);
-	}
-
-	Serial.println();
-}
-
-bool readRegister(uint16_t address, uint16_t& value)
-{
-    uint8_t request[] = {
-        MODBUS_SLAVE_ID,
-        0x03,
-        static_cast<uint8_t>(address >> 8),
-        static_cast<uint8_t>(address & 0xFF),
-        0x00,
-        0x01,
-        0x00,
-        0x00
-    };
-
-    const uint16_t crc = modbusCrc16(request, 6);
-    request[6] = static_cast<uint8_t>(crc & 0xFF);
-    request[7] = static_cast<uint8_t>(crc >> 8);
-
-    while (Serial1.available() > 0)
-    {
-        Serial1.read();
-    }
-
-    delay(5);
-
-    digitalWrite(RS485_DE_PIN, HIGH);
-    delayMicroseconds(50);
-
-    Serial1.write(request, sizeof(request));
-    Serial1.flush();
-
-    digitalWrite(RS485_DE_PIN, LOW);
-
-    uint8_t response[16];
-    size_t length = 0;
-    const uint32_t start = millis();
-
-    while (millis() - start < RESPONSE_TIMEOUT_MS)
-    {
-        while (Serial1.available() > 0 &&
-               length < sizeof(response))
-        {
-            response[length++] =
-                static_cast<uint8_t>(Serial1.read());
-        }
-
-        if (length >= 5)
-        {
-            if (response[1] == 0x83)
-            {
-                break;
-            }
-
-            if (response[1] == 0x03 &&
-                length >= 5 + response[2])
-            {
-                break;
-            }
-        }
-
-        delay(1);
-    }
-
-    if (length < 5 ||
-        response[0] != MODBUS_SLAVE_ID)
-    {
+    if (result.status != modbus::ReadStatus::Ok) {
         return false;
     }
 
-    const uint16_t receivedCrc =
-        static_cast<uint16_t>(response[length - 2]) |
-        (static_cast<uint16_t>(response[length - 1]) << 8);
-
-    if (receivedCrc != modbusCrc16(response, length - 2))
-    {
-        return false;
-    }
-
-    if (response[1] != 0x03 ||
-        response[2] != 2 ||
-        length != 7)
-    {
-        return false;
-    }
-
-    value = (static_cast<uint16_t>(response[3]) << 8) |
-            response[4];
-
+    watts = static_cast<int16_t>(result.value);
     return true;
+}
+
+telemetry::Reading pollRegisters()
+{
+    telemetry::Reading reading;
+    reading.measuredAt = timesync::nowIso8601Utc();
+
+    Serial.println("--- Deye telemetry ---");
+
+    const auto voltage = readRegister(registers::GRID_VOLTAGE, "Grid voltage");
+    if (voltage.status == modbus::ReadStatus::Ok) {
+        Serial.printf("Grid voltage: %.1f V\n", voltage.value * 0.1);
+    }
+
+    const auto relay = readRegister(registers::GRID_RELAY_STATUS, "Grid relay");
+    if (relay.status == modbus::ReadStatus::Ok) {
+        Serial.printf("Grid relay: %s\n", (relay.value & 1) ? "ON" : "OFF");
+    }
+
+    const auto soc = readRegister(registers::BATTERY_SOC, "Battery SOC");
+    if (soc.status == modbus::ReadStatus::Ok) {
+        reading.batterySocOk = true;
+        reading.batterySocPct = soc.value;
+        Serial.printf("Battery SOC: %u%%\n", soc.value);
+    }
+
+    reading.batteryPowerOk =
+        readSignedPower(registers::BATTERY_POWER, "Battery power", reading.batteryPowerW);
+    if (reading.batteryPowerOk) {
+        Serial.printf("Battery power: %.0f W (+discharge / -charge)\n", reading.batteryPowerW);
+    }
+
+    if (registers::PV_POWER_VERIFIED) {
+        double pv1 = 0.0;
+        double pv2 = 0.0;
+
+        reading.pvPowerOk =
+            readSignedPower(registers::PV1_POWER, "PV1 power", pv1) &&
+            readSignedPower(registers::PV2_POWER, "PV2 power", pv2);
+        reading.pvPowerW = reading.pvPowerOk ? pv1 + pv2 : 0.0;
+    }
+
+    if (registers::GRID_POWER_VERIFIED) {
+        reading.gridPowerOk =
+            readSignedPower(registers::GRID_POWER, "Grid power", reading.gridPowerW);
+    }
+
+    if (registers::LOAD_POWER_VERIFIED) {
+        reading.loadPowerOk =
+            readSignedPower(registers::LOAD_POWER, "Load power", reading.loadPowerW);
+    }
+
+    return reading;
+}
+
+void runTelemetryCycle()
+{
+    const telemetry::Reading reading = pollRegisters();
+    const telemetry::PublishResult result = publisher.publish(reading);
+
+    if (result == telemetry::PublishResult::Published) {
+        return;
+    }
+
+    const uint32_t now = millis();
+
+    if (result == telemetry::PublishResult::PublishFailed ||
+        firstCycle ||
+        now - lastSkipLogMs >= config::SKIP_LOG_INTERVAL_MS) {
+        lastSkipLogMs = now;
+        Serial.printf("Telemetry not published: %s\n", telemetry::toString(result));
+    }
+}
+
+void runDiagnosticScan()
+{
+    Serial.println("--- Candidate register scan (UNVERIFIED, not published) ---");
+
+    for (size_t i = 0; i < registers::CANDIDATE_REGISTER_COUNT; ++i) {
+        const registers::CandidateRegister& candidate = registers::CANDIDATE_REGISTERS[i];
+        const modbus::ReadResult result = modbusClient.readHoldingRegister(candidate.address);
+
+        if (result.status == modbus::ReadStatus::Ok) {
+            Serial.printf("reg %u: raw=%u signed=%d hex=0x%04X status=ok | %s\n",
+                          candidate.address,
+                          result.value,
+                          static_cast<int16_t>(result.value),
+                          result.value,
+                          candidate.hypothesis);
+        } else if (result.status == modbus::ReadStatus::ExceptionResponse) {
+            Serial.printf("reg %u: status=modbus_exception code=0x%02X | %s\n",
+                          candidate.address,
+                          result.exceptionCode,
+                          candidate.hypothesis);
+        } else {
+            Serial.printf("reg %u: status=%s | %s\n",
+                          candidate.address,
+                          modbus::toString(result.status),
+                          candidate.hypothesis);
+        }
+
+        delay(config::MODBUS_INTER_FRAME_DELAY_MS);
+
+        // Keep the MQTT session alive during the scan.
+        publisher.loop();
+    }
+
+    Serial.println();
 }
 
 } // namespace
@@ -142,63 +169,35 @@ void setup()
 		delay(100);
 	}
 
-	pinMode(RS485_DE_PIN, OUTPUT);
-	digitalWrite(RS485_DE_PIN, LOW);
-
-	Serial1.begin(MODBUS_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
-
 	Serial.println();
-	Serial.println("HomePowerGuard Modbus RTU test");
-	Serial.println("Slave: 1, function: 03, register: 0");
-	Serial.println("Read-only test; relay control is not used.");
+	Serial.println("HomePowerGuard ESP32 beta firmware");
+	Serial.println("Read-only Modbus RTU (function 0x03); relay control and inverter writes are not used.");
+	Serial.printf("Device id: %s\n", secrets::DEVICE_ID);
+
+	modbusClient.begin(config::MODBUS_BAUD, config::RS485_RX_PIN, config::RS485_TX_PIN);
+
+	publisher.begin();
+	timesync::begin();
 }
 
 void loop()
 {
-	uint16_t gridVoltage = 0;
-	uint16_t gridStatus = 0;
-	uint16_t batterySoc = 0;
-	uint16_t batteryPowerRaw = 0;
+	publisher.loop();
 
-	const bool voltageOk = readRegister(150, gridVoltage);
-	delay(100);
+	const uint32_t now = millis();
 
-	const bool gridOk = readRegister(194, gridStatus);
-	delay(100);
-
-	const bool socOk = readRegister(184, batterySoc);
-	delay(100);
-
-	const bool powerOk = readRegister(190, batteryPowerRaw);
-
-	Serial.println("--- Deye telemetry ---");
-
-	if (gridOk) {
-		Serial.printf("Grid: %s\n", (gridStatus & 1) ? "ON" : "OFF");
-	} else {
-		Serial.println("Grid: read error");
+	if (firstCycle || now - lastTelemetryMs >= config::TELEMETRY_INTERVAL_MS) {
+		lastTelemetryMs = now;
+		runTelemetryCycle();
+		publisher.loop();
 	}
 
-	if (voltageOk) {
-		Serial.printf("Grid voltage: %.1f V\n", gridVoltage * 0.1);
+	if (config::DIAGNOSTIC_MODE_ENABLED &&
+	    (firstCycle || millis() - lastDiagnosticMs >= config::DIAGNOSTIC_INTERVAL_MS)) {
+		lastDiagnosticMs = millis();
+		runDiagnosticScan();
 	}
 
-	if (socOk) {
-		Serial.printf("Battery SOC: %u%%\n", batterySoc);
-	}
-
-	if (powerOk) {
-		const int16_t batteryPower = static_cast<int16_t>(batteryPowerRaw);
-
-		if (batteryPower > 50) {
-			Serial.printf("Battery: discharging %d W\n", batteryPower);
-		} else if (batteryPower < -50) {
-			Serial.printf("Battery: charging %d W\n", -static_cast<int>(batteryPower));
-		} else {
-			Serial.println("Battery: idle");
-		}
-	}
-
-	Serial.println();
-	delay(3000);
+	firstCycle = false;
+	delay(10);
 }

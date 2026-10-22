@@ -5,3 +5,8 @@ build/
 docker/test.pgpass
 docker/mosquitto/data/
 docker/mosquitto/log/
+
+# PlatformIO build output and local firmware secrets (never commit real
+# Wi-Fi/MQTT credentials).
+firmware/esp32-relay/.pio/
+firmware/esp32-relay/include/secrets.h

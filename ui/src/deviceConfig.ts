@@ -1,8 +1,15 @@
-export const deviceConfig = {
-  deviceId: 'simulator-001',
-  source: 'simulator',
-} as const
 
-export const sourceLabel = deviceConfig.source === 'simulator'
-  ? 'Симулятор · тестовые данные'
-  : 'Реальное устройство'
+type TelemetrySource = 'simulator' | 'deye'
+
+export const deviceConfig: {
+  deviceId: string
+  source: TelemetrySource
+} = {
+  deviceId: 'deye-esp32-001',
+  source: 'deye',
+}
+
+export const sourceLabel =
+  deviceConfig.source === 'simulator'
+    ? 'Симулятор · тестовые данные'
+    : 'Deye inverter'
