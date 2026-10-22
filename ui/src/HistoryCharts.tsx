@@ -1,6 +1,6 @@
 // History charts rendered as plain SVG (no charting dependency).
-// Data comes only from the already-loaded REST history; this view does not
-// merge in live WebSocket measurements and does not refetch on its own.
+// Data is supplied by App (REST history merged with live WebSocket
+// measurements); this view does not fetch or merge on its own.
 
 export type HistoryMeasurement = {
   measured_at: string

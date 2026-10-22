@@ -74,8 +74,8 @@ type ApiState =
   | { status: 'error'; message: string }
   | { status: 'success'; measurements: Measurement[] }
 
-type MetricKey = 'battery_soc' | 'pv_power' | 'load_power'
-type MeasurementKey = MetricKey | 'grid_power' | 'battery_power'
+type MetricKey = 'battery_soc' | 'pv_power' | 'load_power' | 'grid_power' | 'battery_power'
+type MeasurementKey = MetricKey
 
 const HISTORY_LIMIT = 100
 
@@ -96,12 +96,28 @@ const metrics: {
     unit: 'В',
   },
   {
+    title: 'Мощность сети',
+    icon: 'grid',
+    tone: 'violet',
+    description: 'Значение как получено; направление не определено',
+    key: 'grid_power',
+    unit: 'Вт',
+  },
+  {
     title: 'Заряд батареи',
     icon: 'battery',
     tone: 'mint',
     description: 'Состояние аккумулятора',
     key: 'battery_soc',
     unit: '%',
+  },
+  {
+    title: 'Мощность батареи',
+    icon: 'battery',
+    tone: 'mint',
+    description: 'Значение как получено; направление не подтверждено',
+    key: 'battery_power',
+    unit: 'Вт',
   },
   {
     title: 'Мощность солнечных панелей',
@@ -161,6 +177,17 @@ function parseMeasurements(payload: unknown): Measurement[] {
   })
 }
 
+// Live points replace REST points with the same parsed measured_at; the API has no stable record ID.
+function mergeHistory(restHistory: Measurement[], liveHistory: Measurement[]): Measurement[] {
+  const liveTimes = new Set(liveHistory.map((measurement) => Date.parse(measurement.measured_at)))
+  return [
+    ...restHistory.filter((measurement) => !liveTimes.has(Date.parse(measurement.measured_at))),
+    ...liveHistory,
+  ]
+    .sort((a, b) => Date.parse(a.measured_at) - Date.parse(b.measured_at))
+    .slice(-HISTORY_LIMIT)
+}
+
 function formatMeasurementTime(value: string): string {
   return `${new Intl.DateTimeFormat('ru-RU', {
     timeZone: 'UTC',
@@ -179,6 +206,7 @@ function App() {
   const [socketState, setSocketState] = useState<SocketState>('connecting')
   const [socketError, setSocketError] = useState<string | null>(null)
   const [liveMeasurement, setLiveMeasurement] = useState<Measurement | null>(null)
+  const [liveHistory, setLiveHistory] = useState<Measurement[]>([])
   const [lastReceiptAt, setLastReceiptAt] = useState<number | null>(null)
   const [now, setNow] = useState(0)
   const [subscriptionStartedAt, setSubscriptionStartedAt] = useState<number | null>(null)
@@ -259,6 +287,11 @@ function App() {
             if (previousMeasurement && Date.parse(measurement.measured_at) < Date.parse(previousMeasurement.measured_at)) return
             liveMeasurementRef.current = measurement
             setLiveMeasurement(measurement)
+            const measuredAt = Date.parse(measurement.measured_at)
+            setLiveHistory((previous) => [
+              ...previous.filter((item) => Date.parse(item.measured_at) !== measuredAt),
+              measurement,
+            ].slice(-HISTORY_LIMIT))
             setLastReceiptAt(Date.now())
           }
         } catch (error) {
@@ -299,6 +332,7 @@ function App() {
   }, [])
 
   const history = apiState.status === 'success' ? apiState.measurements : []
+  const chartHistory = apiState.status === 'success' ? mergeHistory(history, liveHistory) : []
   const latestRestMeasurement = history.reduce<Measurement | null>((latest, measurement) => (
     latest === null || Date.parse(measurement.measured_at) > Date.parse(latest.measured_at)
       ? measurement
@@ -421,7 +455,7 @@ function App() {
               <button type="button" onClick={() => void loadMeasurements()}>Повторить запрос</button>
             </div>
           )}
-          {apiState.status === 'success' && apiState.measurements.length === 0 && (
+          {apiState.status === 'success' && chartHistory.length === 0 && (
             <p className="request-message">История измерений пока пуста.</p>
           )}
         </section>
@@ -432,18 +466,17 @@ function App() {
               <p className="eyebrow">ДИНАМИКА</p>
               <h2 id="history-title">История измерений</h2>
             </div>
-            <span className="history-period">{apiState.status === 'success' ? `Записей: ${apiState.measurements.length}` : 'Последние измерения'}</span>
+            <span className="history-period">{apiState.status === 'success' ? `Записей: ${chartHistory.length}` : 'Последние измерения'}</span>
           </div>
-          {apiState.status === 'success' && apiState.measurements.length > 0 ? (
+          {apiState.status === 'success' && chartHistory.length > 0 ? (
             <div className="history-charts">
               <p className="history-note">
-                Показано {apiState.measurements.length} из последних {HISTORY_LIMIT} записей, доступных по этому запросу —
-                более старые измерения в выборку не входят. История построена по данным, загруженным по REST при открытии
-                страницы, и не обновляется автоматически; новые измерения по WebSocket видны выше, в карточках и во
-                времени обновления, но в эту историю не добавляются без обновления страницы.
+                Показано {chartHistory.length} последних записей (не более {HISTORY_LIMIT}) — более старые измерения в
+                выборку не входят. История загружается по REST при открытии страницы и дополняется новыми измерениями
+                по WebSocket без перезагрузки.
               </p>
-              <PowerHistoryChart measurements={apiState.measurements} />
-              <SocHistoryChart measurements={apiState.measurements} />
+              <PowerHistoryChart measurements={chartHistory} />
+              <SocHistoryChart measurements={chartHistory} />
             </div>
           ) : (
             <div className="history-empty">
