@@ -29,10 +29,10 @@ TEST(TelemetryParserTest, ParsesValidTelemetry)
 
     ASSERT_TRUE(measurement.has_value());
 
-    EXPECT_DOUBLE_EQ(measurement->pvPower, 1924.66);
-    EXPECT_DOUBLE_EQ(measurement->gridPower, -200.00);
+    EXPECT_DOUBLE_EQ(measurement->pvPower.value(), 1924.66);
+    EXPECT_DOUBLE_EQ(measurement->gridPower.value(), -200.00);
     EXPECT_DOUBLE_EQ(measurement->batteryPower, -449.73);
-    EXPECT_DOUBLE_EQ(measurement->loadPower, 1274.93);
+    EXPECT_DOUBLE_EQ(measurement->loadPower.value(), 1274.93);
     EXPECT_DOUBLE_EQ(measurement->batterySoc, 75.16);
 
     const auto expectedTime =
@@ -99,4 +99,118 @@ TEST(TelemetryParserTest, RejectsMissingMeasurement)
     const auto measurement = parser.parse(payload);
 
     EXPECT_FALSE(measurement.has_value());
+}
+
+TEST(TelemetryParserTest, AcceptsAbsentOptionalPowerFields)
+{
+    const std::string payload = R"json(
+{
+    "schema_version": 1,
+    "seq": 1,
+    "measured_at": "2026-09-24T18:50:00.316Z",
+    "measurement": {
+        "battery_power_w": -203.0,
+        "battery_soc_pct": 98.0
+    }
+}
+)json";
+
+    const protocol::TelemetryParser parser;
+
+    const auto measurement = parser.parse(payload);
+
+    ASSERT_TRUE(measurement.has_value());
+
+    EXPECT_FALSE(measurement->pvPower.has_value());
+    EXPECT_FALSE(measurement->gridPower.has_value());
+    EXPECT_FALSE(measurement->loadPower.has_value());
+    EXPECT_DOUBLE_EQ(measurement->batteryPower, -203.0);
+    EXPECT_DOUBLE_EQ(measurement->batterySoc, 98.0);
+}
+
+TEST(TelemetryParserTest, AcceptsNullOptionalPowerFields)
+{
+    const std::string payload = R"json(
+{
+    "schema_version": 1,
+    "seq": 2,
+    "measured_at": "2026-09-24T18:50:00.316Z",
+    "measurement": {
+        "pv_power_w": null,
+        "grid_power_w": null,
+        "battery_power_w": 150.0,
+        "load_power_w": null,
+        "battery_soc_pct": 60.0
+    }
+}
+)json";
+
+    const protocol::TelemetryParser parser;
+
+    const auto measurement = parser.parse(payload);
+
+    ASSERT_TRUE(measurement.has_value());
+
+    EXPECT_FALSE(measurement->pvPower.has_value());
+    EXPECT_FALSE(measurement->gridPower.has_value());
+    EXPECT_FALSE(measurement->loadPower.has_value());
+    EXPECT_DOUBLE_EQ(measurement->batteryPower, 150.0);
+    EXPECT_DOUBLE_EQ(measurement->batterySoc, 60.0);
+}
+
+TEST(TelemetryParserTest, RejectsNonNumericOptionalPowerField)
+{
+    const std::string payload = R"json(
+{
+    "schema_version": 1,
+    "seq": 3,
+    "measured_at": "2026-09-24T18:50:00.316Z",
+    "measurement": {
+        "pv_power_w": "100",
+        "battery_power_w": 150.0,
+        "battery_soc_pct": 60.0
+    }
+}
+)json";
+
+    const protocol::TelemetryParser parser;
+
+    EXPECT_FALSE(parser.parse(payload).has_value());
+}
+
+TEST(TelemetryParserTest, RejectsMissingBatterySoc)
+{
+    const std::string payload = R"json(
+{
+    "schema_version": 1,
+    "seq": 4,
+    "measured_at": "2026-09-24T18:50:00.316Z",
+    "measurement": {
+        "battery_power_w": 150.0
+    }
+}
+)json";
+
+    const protocol::TelemetryParser parser;
+
+    EXPECT_FALSE(parser.parse(payload).has_value());
+}
+
+TEST(TelemetryParserTest, RejectsNullBatteryPower)
+{
+    const std::string payload = R"json(
+{
+    "schema_version": 1,
+    "seq": 5,
+    "measured_at": "2026-09-24T18:50:00.316Z",
+    "measurement": {
+        "battery_power_w": null,
+        "battery_soc_pct": 60.0
+    }
+}
+)json";
+
+    const protocol::TelemetryParser parser;
+
+    EXPECT_FALSE(parser.parse(payload).has_value());
 }

@@ -44,7 +44,7 @@ The domain layer contains core application concepts independent of infrastructur
 Main types include:
 
 * `domain::DeviceId` — identifies an inverter or other telemetry source.
-* `domain::Measurement` — represents measurement values.
+* `domain::Measurement` — represents measurement values. `pvPower`, `gridPower`, and `loadPower` are `std::optional<double>`; an empty value means the source did not provide it and is stored as SQL `NULL`, never as zero.
 
 Device identification is modeled separately from measurement values.
 
@@ -53,6 +53,14 @@ Device identification is modeled separately from measurement values.
 The protocol layer handles the conversion of incoming telemetry payloads into application data.
 
 `protocol::TelemetryParser` parses incoming telemetry messages and validates their contents before they enter the application layer.
+
+Telemetry input (`schema_version` 1):
+
+* `measured_at` (ISO 8601 UTC with 1–3 fractional digits and `Z`), `measurement.battery_power_w`, and `measurement.battery_soc_pct` are required numbers.
+* `measurement.pv_power_w`, `measurement.grid_power_w`, and `measurement.load_power_w` are optional. They may be absent or `null`; either is treated as unavailable.
+* Any present field with a non-numeric value, or any missing required field, rejects the whole message.
+
+The simulator always sends all five measurement fields. The ESP32 firmware omits a field when its register is disabled or its read fails in that cycle.
 
 Protocol-specific parsing logic remains outside the domain layer.
 

@@ -51,6 +51,33 @@ std::string formatDouble(const double value)
     return stream.str();
 }
 
+std::optional<std::string> formatOptionalDouble(const std::optional<double>& value)
+{
+    if (!value) {
+        return std::nullopt;
+    }
+
+    return formatDouble(*value);
+}
+
+// A null pointer is passed to libpq as SQL NULL.
+const char* parameterValue(const std::optional<std::string>& value)
+{
+    return value ? value->c_str() : nullptr;
+}
+
+std::optional<double> optionalDouble(
+    const PostgresResult& result,
+    const int row,
+    const int column)
+{
+    if (result.isNull(row, column)) {
+        return std::nullopt;
+    }
+
+    return std::stod(result.value(row, column));
+}
+
 std::optional<std::chrono::system_clock::time_point>
 parseTimestamp(const char* value)
 {
@@ -114,19 +141,19 @@ std::int64_t MeasurementRepository::save(
     const domain::Measurement& measurement)
 {
     const std::string measuredAt = formatTimestamp(measurement.measuredAt);
-    const std::string pvPower = formatDouble(measurement.pvPower);
-    const std::string gridPower = formatDouble(measurement.gridPower);
+    const auto pvPower = formatOptionalDouble(measurement.pvPower);
+    const auto gridPower = formatOptionalDouble(measurement.gridPower);
     const std::string batteryPower = formatDouble(measurement.batteryPower);
-    const std::string loadPower = formatDouble(measurement.loadPower);
+    const auto loadPower = formatOptionalDouble(measurement.loadPower);
     const std::string batterySoc = formatDouble(measurement.batterySoc);
 
     const char* values[] = {
         deviceId.value.c_str(),
         measuredAt.c_str(),
-        pvPower.c_str(),
-        gridPower.c_str(),
+        parameterValue(pvPower),
+        parameterValue(gridPower),
         batteryPower.c_str(),
-        loadPower.c_str(),
+        parameterValue(loadPower),
         batterySoc.c_str()
     };
 
@@ -189,13 +216,13 @@ std::vector<MeasurementRecord> MeasurementRepository::findByDevice(
 
         record.measurement.measuredAt = *measuredAt;
         record.measurement.pvPower =
-            std::stod(result.value(row, 2));
+            optionalDouble(result, row, 2);
         record.measurement.gridPower =
-            std::stod(result.value(row, 3));
+            optionalDouble(result, row, 3);
         record.measurement.batteryPower =
             std::stod(result.value(row, 4));
         record.measurement.loadPower =
-            std::stod(result.value(row, 5));
+            optionalDouble(result, row, 5);
         record.measurement.batterySoc =
             std::stod(result.value(row, 6));
 

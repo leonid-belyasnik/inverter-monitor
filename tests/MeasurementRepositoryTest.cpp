@@ -145,12 +145,83 @@ TEST(MeasurementRepositoryTest, FindsMeasurementsByDevice)
     ASSERT_EQ(records.size(), 2);
 
     EXPECT_EQ(records[0].deviceId.value, "deye-001");
-    EXPECT_DOUBLE_EQ(records[0].measurement.pvPower, 2000.0);
+    EXPECT_DOUBLE_EQ(records[0].measurement.pvPower.value(), 2000.0);
     EXPECT_DOUBLE_EQ(records[0].measurement.batterySoc, 71.0);
 
     EXPECT_EQ(records[1].deviceId.value, "deye-001");
-    EXPECT_DOUBLE_EQ(records[1].measurement.pvPower, 1000.0);
+    EXPECT_DOUBLE_EQ(records[1].measurement.pvPower.value(), 1000.0);
     EXPECT_DOUBLE_EQ(records[1].measurement.batterySoc, 70.0);
+
+    const auto rollbackResult = connection.execute("ROLLBACK");
+
+    ASSERT_TRUE(rollbackResult.isOk())
+        << "Failed to rollback transaction";
+}
+
+TEST(MeasurementRepositoryTest, PersistsAndReadsMissingOptionalFieldsAsNull)
+{
+    database::PostgresConnection connection("");
+
+    ASSERT_TRUE(connection.isOk())
+        << "Connection failed: "
+        << connection.errorMessage();
+
+    database::DatabaseSchema schema(connection);
+
+    ASSERT_TRUE(schema.initialize())
+        << "Schema initialization failed";
+
+    const auto beginResult = connection.execute("BEGIN");
+
+    ASSERT_TRUE(beginResult.isOk())
+        << "Failed to begin transaction";
+
+    database::MeasurementRepository repository(connection);
+
+    const domain::DeviceId deviceId{"deye-null-test"};
+
+    const domain::Measurement measurement{
+        .measuredAt = std::chrono::system_clock::from_time_t(1779706200),
+        .pvPower = std::nullopt,
+        .gridPower = std::nullopt,
+        .batteryPower = -203.0,
+        .loadPower = std::nullopt,
+        .batterySoc = 98.0
+    };
+
+    const auto measurementId = repository.save(deviceId, measurement);
+
+    ASSERT_NE(measurementId, 0);
+
+    const std::string query =
+        "SELECT pv_power, grid_power, battery_power, load_power, battery_soc "
+        "FROM measurements "
+        "WHERE id = " + std::to_string(measurementId);
+
+    const auto result = connection.execute(query.c_str());
+
+    ASSERT_TRUE(result.isOk())
+        << "Failed to read measurement";
+
+    ASSERT_EQ(result.rowCount(), 1);
+
+    EXPECT_TRUE(result.isNull(0, 0));
+    EXPECT_TRUE(result.isNull(0, 1));
+    EXPECT_FALSE(result.isNull(0, 2));
+    EXPECT_TRUE(result.isNull(0, 3));
+    EXPECT_FALSE(result.isNull(0, 4));
+    EXPECT_DOUBLE_EQ(std::stod(result.value(0, 2)), -203.0);
+    EXPECT_DOUBLE_EQ(std::stod(result.value(0, 4)), 98.0);
+
+    const auto records = repository.findByDevice(deviceId, 100);
+
+    ASSERT_EQ(records.size(), 1);
+
+    EXPECT_FALSE(records[0].measurement.pvPower.has_value());
+    EXPECT_FALSE(records[0].measurement.gridPower.has_value());
+    EXPECT_FALSE(records[0].measurement.loadPower.has_value());
+    EXPECT_DOUBLE_EQ(records[0].measurement.batteryPower, -203.0);
+    EXPECT_DOUBLE_EQ(records[0].measurement.batterySoc, 98.0);
 
     const auto rollbackResult = connection.execute("ROLLBACK");
 

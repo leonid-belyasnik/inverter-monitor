@@ -18,7 +18,8 @@ public:
     int rowCount() const;
     int columnCount() const;
     const char* value(int row, int column) const;
-    
+    bool isNull(int row, int column) const;
+
     const char* errorMessage() const;
 
     PGresult* get() const;

@@ -74,16 +74,7 @@ void ApiRoutes::registerRoutes(
             boost::json::array items;
 
             for (const auto &record : measurements) {
-                boost::json::object item;
-
-                item["measured_at"] = api::formatTimestamp(record.measurement.measuredAt);
-                item["pv_power"] = record.measurement.pvPower;
-                item["grid_power"] = record.measurement.gridPower;
-                item["battery_power"] = record.measurement.batteryPower;
-                item["load_power"] = record.measurement.loadPower;
-                item["battery_soc"] = record.measurement.batterySoc;
-
-                items.push_back(std::move(item));
+                items.push_back(api::formatMeasurement(record.measurement));
             }
 
             boost::json::object body;

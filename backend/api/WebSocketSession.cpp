@@ -118,15 +118,7 @@ void WebSocketSession::publish(const application::IngestedMeasurement &measureme
 	message["type"] = "measurement";
 	message["device_id"] = measurement.deviceId.value;
 
-	boost::json::object data;
-	data["measured_at"] = formatTimestamp(measurement.measurement.measuredAt);
-	data["pv_power"] = measurement.measurement.pvPower;
-	data["grid_power"] = measurement.measurement.gridPower;
-	data["battery_power"] = measurement.measurement.batteryPower;
-	data["load_power"] = measurement.measurement.loadPower;
-	data["battery_soc"] = measurement.measurement.batterySoc;
-
-	message["data"] = std::move(data);
+	message["data"] = formatMeasurement(measurement.measurement);
 
 	auto response = std::make_shared<std::string>(boost::json::serialize(message));
 

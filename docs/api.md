@@ -68,6 +68,19 @@ The example shows the response structure; actual values and the number of return
 
 Timestamps use ISO 8601 UTC format.
 
+Every measurement object always contains all six keys. `measured_at` is always a string; `battery_power` and `battery_soc` are always numbers. `pv_power`, `grid_power`, and `load_power` are `null` when the telemetry source did not provide the value (see [Telemetry Input](architecture.md#protocol)); `null` means "unavailable", never zero. Example of a record from a source that publishes only battery values:
+
+```json
+{
+  "measured_at": "2026-10-22T09:15:00.120Z",
+  "pv_power": null,
+  "grid_power": null,
+  "battery_power": -203.0,
+  "load_power": null,
+  "battery_soc": 98.0
+}
+```
+
 ## WebSocket API
 
 **Endpoint:** `ws://localhost:8081`
@@ -124,7 +137,7 @@ Example:
 }
 ```
 
-The `device_id` identifies the source device. Measurement values are contained in the `data` object.
+The `device_id` identifies the source device. Measurement values are contained in the `data` object, which has the same shape as a REST measurement object, including `null` for unavailable `pv_power`, `grid_power`, and `load_power`.
 
 Timestamps use ISO 8601 UTC format.
 

@@ -1,9 +1,25 @@
 #include "ApiFormatting.h"
 
 #include <iomanip>
+#include <optional>
 #include <sstream>
 
+#include <boost/json/value.hpp>
+
 namespace api {
+
+namespace {
+
+boost::json::value optionalValue(const std::optional<double>& value)
+{
+    if (!value) {
+        return nullptr;
+    }
+
+    return *value;
+}
+
+} // namespace
 
 std::string formatTimestamp(
     const std::chrono::system_clock::time_point& timePoint)
@@ -28,6 +44,20 @@ std::string formatTimestamp(
            << 'Z';
 
     return stream.str();
+}
+
+boost::json::object formatMeasurement(const domain::Measurement& measurement)
+{
+    boost::json::object object;
+
+    object["measured_at"] = formatTimestamp(measurement.measuredAt);
+    object["pv_power"] = optionalValue(measurement.pvPower);
+    object["grid_power"] = optionalValue(measurement.gridPower);
+    object["battery_power"] = measurement.batteryPower;
+    object["load_power"] = optionalValue(measurement.loadPower);
+    object["battery_soc"] = measurement.batterySoc;
+
+    return object;
 }
 
 }

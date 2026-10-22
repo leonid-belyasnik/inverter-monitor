@@ -42,6 +42,11 @@ const char* PostgresResult::value(const int row, const int column) const
     return PQgetvalue(m_result.get(), row, column);
 }
 
+bool PostgresResult::isNull(const int row, const int column) const
+{
+    return PQgetisnull(m_result.get(), row, column) == 1;
+}
+
 const char* PostgresResult::errorMessage() const
 {
     return m_result ? PQresultErrorMessage(m_result.get()) : "No result";

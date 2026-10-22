@@ -80,10 +80,10 @@ std::string formatMeasurement(
            << formatTimestamp(measurement.measuredAt)
            << "\","
            << "\"measurement\":{"
-           << "\"pv_power_w\":" << measurement.pvPower << ','
-           << "\"grid_power_w\":" << measurement.gridPower << ','
+           << "\"pv_power_w\":" << measurement.pvPower.value() << ','
+           << "\"grid_power_w\":" << measurement.gridPower.value() << ','
            << "\"battery_power_w\":" << measurement.batteryPower << ','
-           << "\"load_power_w\":" << measurement.loadPower << ','
+           << "\"load_power_w\":" << measurement.loadPower.value() << ','
            << "\"battery_soc_pct\":" << measurement.batterySoc
            << "}"
            << "}";

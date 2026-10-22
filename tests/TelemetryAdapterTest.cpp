@@ -47,9 +47,9 @@ TEST(TelemetryAdapterTest, AdaptsValidTopicAndPayloadForIngestion)
 
     ASSERT_TRUE(ingested.has_value());
     EXPECT_EQ(ingested->deviceId.value, "deye-001");
-    EXPECT_DOUBLE_EQ(ingested->measurement.pvPower, 1924.66);
-    EXPECT_DOUBLE_EQ(ingested->measurement.gridPower, -200.00);
+    EXPECT_DOUBLE_EQ(ingested->measurement.pvPower.value(), 1924.66);
+    EXPECT_DOUBLE_EQ(ingested->measurement.gridPower.value(), -200.00);
     EXPECT_DOUBLE_EQ(ingested->measurement.batteryPower, -449.73);
-    EXPECT_DOUBLE_EQ(ingested->measurement.loadPower, 1274.93);
+    EXPECT_DOUBLE_EQ(ingested->measurement.loadPower.value(), 1274.93);
     EXPECT_DOUBLE_EQ(ingested->measurement.batterySoc, 75.16);
 }

@@ -6,7 +6,7 @@ The main runtime serves REST on port `8080`.
 
 * `GET /api/v1/health` returns plain text `OK\n` when the HTTP route responds. It does not report MQTT state or telemetry freshness.
 * `GET /api/v1/devices/{deviceId}/measurements?limit=N` returns `{ "device_id": "...", "measurements": [...] }`. `limit` defaults to 100. The code parses it with `std::stoul` and uses values from 1 through 1000; missing values, conversion failures, and parsed values outside that range use the default. Because the code does not check that the whole string was consumed, a numeric prefix with trailing characters can be accepted (for example, `3x` may be parsed as `3`). This is the current implementation behavior; strict validation is an open API issue. Records are ordered newest-first by `measured_at`.
-* Each measurement currently contains `measured_at`, `pv_power`, `grid_power`, `battery_power`, `load_power`, and `battery_soc`. Timestamps are serialized as ISO 8601 UTC strings. There is no record ID, `backend_received_at`, voltage, quality flag, or source-kind field in this response.
+* Each measurement currently contains `measured_at`, `pv_power`, `grid_power`, `battery_power`, `load_power`, and `battery_soc`. Timestamps are serialized as ISO 8601 UTC strings. `pv_power`, `grid_power`, and `load_power` are `null` when the source did not provide them; `battery_power` and `battery_soc` are always numbers. There is no record ID, `backend_received_at`, voltage, quality flag, or source-kind field in this response.
 
 ## Current WebSocket Contract
 
@@ -47,13 +47,17 @@ The client considers subscription confirmed only when `type` is `subscribed` and
 }
 ```
 
+`data` uses the same `null` rule as REST for `pv_power`, `grid_power`, and `load_power`. The UI must show `null` as unavailable, never as zero.
+
 Subscription does not send a snapshot of the most recent measurement. The client should load initial/history data through REST and use WebSocket for subsequent updates. The current WebSocket measurement message also has no `backend_received_at`, record ID, sequence number, or source-kind field.
 
 ## Units and Sign Conventions
 
 The simulator input field names explicitly suffix power values with `_w` and state of charge with `_pct`. The backend parser reads these values as numbers, and REST/WebSocket remove those suffixes. It is therefore appropriate to display simulator power in W and state of charge in percent. The code does not establish whether every real source uses these same units; confirm the real device adapter/protocol before presenting its values with those units.
 
-The simulator code comments define its battery convention: positive `battery_power` means discharge; negative means charge. PV and load are generated as positive values by the simulator. The simulator sets `grid_power` to `-200`, but code does not document whether negative means import or export. The backend does not normalize or validate these signs. Until source conventions are confirmed, preserve signed values and avoid import/export labels or derived flow diagrams. Exact grid-power sign semantics for real telemetry remain an open question.
+The ESP32 beta firmware (`firmware/esp32-relay`) publishes `battery_soc_pct` (%) and `battery_power_w` (W) from verified Deye registers. It also publishes `pv_power_w`, `grid_power_w`, and `load_power_w` (W), temporarily from registers that are **not confirmed** against the inverter, so their scale, sign, and meaning may be wrong. A field is `null` when its read fails or its register is disabled in firmware. See `firmware/esp32-relay/REGISTER_MAP.md`.
+
+The simulator code comments define its battery convention: positive `battery_power` means discharge; negative means charge. The ESP32 firmware uses the same convention, but for the real inverter the sign has only been observed while charging; the discharge sign still requires hardware verification. PV and load are generated as positive values by the simulator. The simulator sets `grid_power` to `-200`, but code does not document whether negative means import or export. The backend does not normalize or validate these signs. Until source conventions are confirmed, preserve signed values and avoid import/export labels or derived flow diagrams. Exact grid-power sign semantics for real telemetry remain an open question.
 
 Grid voltage is absent from the domain measurement, parser input, database, REST, and WebSocket contracts. It is unavailable to the beta until its source and field are confirmed.
 

@@ -56,6 +56,21 @@ parseTimestamp(const std::string_view value)
         + std::chrono::milliseconds(milliseconds);
 }
 
+// Absent and null fields yield an empty optional. Any other non-numeric
+// value throws, so the whole payload is rejected.
+std::optional<double> optionalNumber(
+    const boost::json::object& object,
+    const std::string_view key)
+{
+    const auto* value = object.if_contains(key);
+
+    if (value == nullptr || value->is_null()) {
+        return std::nullopt;
+    }
+
+    return value->to_number<double>();
+}
+
 } // namespace
 
 namespace protocol {
@@ -78,16 +93,16 @@ std::optional<domain::Measurement> TelemetryParser::parse(
         domain::Measurement result;
 
         result.pvPower =
-            measurement.at("pv_power_w").to_number<double>();
+            optionalNumber(measurement, "pv_power_w");
 
         result.gridPower =
-            measurement.at("grid_power_w").to_number<double>();
+            optionalNumber(measurement, "grid_power_w");
 
         result.batteryPower =
             measurement.at("battery_power_w").to_number<double>();
 
         result.loadPower =
-            measurement.at("load_power_w").to_number<double>();
+            optionalNumber(measurement, "load_power_w");
 
         result.batterySoc =
             measurement.at("battery_soc_pct").to_number<double>();
