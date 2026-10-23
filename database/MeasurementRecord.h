@@ -7,8 +7,8 @@ namespace database {
 
 struct MeasurementRecord
 {
-    domain::DeviceId deviceId;
-    domain::Measurement measurement;
+	domain::DeviceId deviceId;
+	domain::Measurement measurement;
 };
 
 } // namespace database

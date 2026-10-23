@@ -1,10 +1,11 @@
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <ctime>
-#include <atomic>
+#include <exception>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -12,7 +13,6 @@
 #include <sstream>
 #include <string>
 #include <thread>
-#include <exception>
 
 #include <api/ApiRoutes.h>
 #include <api/HttpRouter.h>
@@ -59,7 +59,12 @@ int getEnvironmentInt(const char *name, const int defaultValue)
 	}
 }
 
-enum class LogLevel { Info, Warning, Error };
+enum class LogLevel
+{
+	Info,
+	Warning,
+	Error
+};
 
 std::mutex logMutex;
 
@@ -174,9 +179,9 @@ connectDatabase(const database::StartupRetryPolicy &policy)
 		}
 
 		if (attempt > 1 && elapsed() >= policy.deadline) {
-			logMessage(LogLevel::Error, "Database startup deadline of " +
-			                                std::to_string(policy.deadline.count()) +
-			                                " ms exceeded before attempt " + std::to_string(attempt));
+			logMessage(LogLevel::Error,
+			           "Database startup deadline of " + std::to_string(policy.deadline.count()) +
+			               " ms exceeded before attempt " + std::to_string(attempt));
 			return nullptr;
 		}
 
@@ -219,22 +224,22 @@ connectDatabase(const database::StartupRetryPolicy &policy)
 		                            database::toString(kind) + " error): " + reason;
 
 		switch (decision.verdict) {
-		case database::RetryVerdict::Retry:
-			logMessage(LogLevel::Warning,
-			           failure + "; retrying in " + std::to_string(decision.delay.count()) + " ms");
-			break;
-		case database::RetryVerdict::PermanentFailure:
-			logMessage(LogLevel::Error, failure + "; not retrying");
-			return nullptr;
-		case database::RetryVerdict::AttemptsExhausted:
-			logMessage(LogLevel::Error, failure + "; giving up after " + std::to_string(attempt) +
-			                                " attempts");
-			return nullptr;
-		case database::RetryVerdict::DeadlineExceeded:
-			logMessage(LogLevel::Error, failure + "; giving up, the next attempt would start after the " +
-			                                std::to_string(policy.deadline.count()) +
-			                                " ms startup deadline");
-			return nullptr;
+			case database::RetryVerdict::Retry:
+				logMessage(LogLevel::Warning, failure + "; retrying in " +
+				                                  std::to_string(decision.delay.count()) + " ms");
+				break;
+			case database::RetryVerdict::PermanentFailure:
+				logMessage(LogLevel::Error, failure + "; not retrying");
+				return nullptr;
+			case database::RetryVerdict::AttemptsExhausted:
+				logMessage(LogLevel::Error,
+				           failure + "; giving up after " + std::to_string(attempt) + " attempts");
+				return nullptr;
+			case database::RetryVerdict::DeadlineExceeded:
+				logMessage(LogLevel::Error,
+				           failure + "; giving up, the next attempt would start after the " +
+				               std::to_string(policy.deadline.count()) + " ms startup deadline");
+				return nullptr;
 		}
 
 		if (!waitUnlessStopped(decision.delay)) {
@@ -270,7 +275,7 @@ int main()
 	try {
 		httpServer = std::make_unique<api::HttpServer>("0.0.0.0", 8080, httpRouter);
 		httpServer->listen();
-	} catch (const std::exception& error) {
+	} catch (const std::exception &error) {
 		logMessage(LogLevel::Error,
 		           std::string("HTTP server startup failed on port 8080: ") + error.what());
 		return 1;
@@ -279,7 +284,7 @@ int main()
 	std::unique_ptr<api::WebSocketServer> webSocketServer;
 	try {
 		webSocketServer = std::make_unique<api::WebSocketServer>("0.0.0.0", 8081);
-	} catch (const std::exception& error) {
+	} catch (const std::exception &error) {
 		logMessage(LogLevel::Error,
 		           std::string("WebSocket server startup failed on port 8081: ") + error.what());
 		return 1;
@@ -298,7 +303,7 @@ int main()
 	std::thread httpThread([&httpServer, &httpThreadFailed] {
 		try {
 			httpServer->run();
-		} catch (const std::exception& error) {
+		} catch (const std::exception &error) {
 			logMessage(LogLevel::Error, std::string("HTTP server failed: ") + error.what());
 			httpThreadFailed = true;
 		} catch (...) {
@@ -311,15 +316,16 @@ int main()
 		webSocketThread = std::thread([&webSocketServer, &webSocketThreadFailed] {
 			try {
 				webSocketServer->run();
-			} catch (const std::exception& error) {
-				logMessage(LogLevel::Error, std::string("WebSocket server failed: ") + error.what());
+			} catch (const std::exception &error) {
+				logMessage(LogLevel::Error,
+				           std::string("WebSocket server failed: ") + error.what());
 				webSocketThreadFailed = true;
 			} catch (...) {
 				logMessage(LogLevel::Error, "WebSocket server failed with an unknown error");
 				webSocketThreadFailed = true;
 			}
 		});
-	} catch (const std::exception& error) {
+	} catch (const std::exception &error) {
 		logMessage(LogLevel::Error,
 		           std::string("WebSocket server thread startup failed: ") + error.what());
 		httpServer->stop();
@@ -329,46 +335,47 @@ int main()
 	auto stopServers = [&] {
 		httpServer->stop();
 		webSocketServer->stop();
-		if (httpThread.joinable()) httpThread.join();
-		if (webSocketThread.joinable()) webSocketThread.join();
+		if (httpThread.joinable())
+			httpThread.join();
+		if (webSocketThread.joinable())
+			webSocketThread.join();
 	};
 
 	logMessage(LogLevel::Info, "Starting inverter-monitor");
 	logMessage(LogLevel::Info, "MQTT broker: " + mqttHost + ':' + std::to_string(mqttPort));
 
-	mqtt::MqttClient mqtt("inverter-monitor-backend", mqttHost, mqttPort,
-	                      [&telemetryAdapter, &ingestion](const std::string_view topic,
-	                                                      const std::string_view payload) {
-		                      const auto measurement = telemetryAdapter.adapt(topic, payload);
+	mqtt::MqttClient mqtt(
+	    "inverter-monitor-backend", mqttHost, mqttPort,
+	    [&telemetryAdapter, &ingestion](const std::string_view topic,
+	                                    const std::string_view payload) {
+		    const auto measurement = telemetryAdapter.adapt(topic, payload);
 
-		                      if (!measurement) {
-			                      logMessage(LogLevel::Warning, "Invalid telemetry topic or payload");
-			                      return;
-		                      }
+		    if (!measurement) {
+			    logMessage(LogLevel::Warning, "Invalid telemetry topic or payload");
+			    return;
+		    }
 
-		                      application::IngestionError error;
-		                      const auto measurementId = ingestion.ingest(*measurement, &error);
-		                      const std::string &deviceId = measurement->deviceId.value;
+		    application::IngestionError error;
+		    const auto measurementId = ingestion.ingest(*measurement, &error);
+		    const std::string &deviceId = measurement->deviceId.value;
 
-		                      if (!measurementId) {
-			                      logMessage(LogLevel::Error,
-			                                 "Failed to persist telemetry for device " + deviceId +
-			                                     ": " + describeIngestionError(error));
-			                      return;
-		                      }
+		    if (!measurementId) {
+			    logMessage(LogLevel::Error, "Failed to persist telemetry for device " + deviceId +
+			                                    ": " + describeIngestionError(error));
+			    return;
+		    }
 
-		                      logMessage(LogLevel::Info, "Persisted telemetry for device " + deviceId +
-		                                                     " as measurement " +
-		                                                     std::to_string(*measurementId));
+		    logMessage(LogLevel::Info, "Persisted telemetry for device " + deviceId +
+		                                   " as measurement " + std::to_string(*measurementId));
 
-		                      if (!error.message.empty()) {
-			                      logMessage(LogLevel::Warning,
-			                                 "Measurement " + std::to_string(*measurementId) +
-			                                     " for device " + deviceId +
-			                                     " was persisted, but delivery to WebSocket clients failed: " +
-			                                     describeIngestionError(error));
-		                      }
-	                      });
+		    if (!error.message.empty()) {
+			    logMessage(LogLevel::Warning,
+			               "Measurement " + std::to_string(*measurementId) + " for device " +
+			                   deviceId +
+			                   " was persisted, but delivery to WebSocket clients failed: " +
+			                   describeIngestionError(error));
+		    }
+	    });
 
 	if (!mqtt.connect()) {
 		logMessage(LogLevel::Error, "MQTT connection failed: " + mqtt.errorMessage());

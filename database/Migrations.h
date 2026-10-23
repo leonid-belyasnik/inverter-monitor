@@ -7,6 +7,6 @@
 namespace database {
 
 // Applied migrations must never be edited; schema changes are added as new versions.
-const std::vector<Migration>& allMigrations();
+const std::vector<Migration> &allMigrations();
 
 } // namespace database

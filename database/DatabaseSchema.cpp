@@ -5,37 +5,34 @@
 
 namespace database {
 
-DatabaseSchema::DatabaseSchema(PostgresConnection& connection)
-    : m_connection(connection)
-{
-}
+DatabaseSchema::DatabaseSchema(PostgresConnection &connection) : m_connection(connection) {}
 
 bool DatabaseSchema::initialize()
 {
-    MigrationRunner runner(m_connection, allMigrations());
+	MigrationRunner runner(m_connection, allMigrations());
 
-    const auto result = runner.run();
+	const auto result = runner.run();
 
-    m_errorMessage = result.error;
-    m_errorKind = result.errorKind;
-    m_sqlState = result.sqlState;
+	m_errorMessage = result.error;
+	m_errorKind = result.errorKind;
+	m_sqlState = result.sqlState;
 
-    return result.ok;
+	return result.ok;
 }
 
-const std::string& DatabaseSchema::errorMessage() const
+const std::string &DatabaseSchema::errorMessage() const
 {
-    return m_errorMessage;
+	return m_errorMessage;
 }
 
 ErrorKind DatabaseSchema::errorKind() const
 {
-    return m_errorKind;
+	return m_errorKind;
 }
 
-const std::string& DatabaseSchema::sqlState() const
+const std::string &DatabaseSchema::sqlState() const
 {
-    return m_sqlState;
+	return m_sqlState;
 }
 
 } // namespace database

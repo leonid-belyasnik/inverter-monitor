@@ -4,144 +4,115 @@
 
 namespace api {
 
-namespace
+namespace {
+
+std::vector<std::string> splitPath(const std::string &path)
 {
+	std::vector<std::string> parts;
 
-std::vector<std::string> splitPath(const std::string& path)
-{
-    std::vector<std::string> parts;
+	std::size_t start = 0;
 
-    std::size_t start = 0;
+	while (start < path.size()) {
+		const auto separator = path.find('/', start);
 
-    while (start < path.size()) {
-        const auto separator = path.find('/', start);
+		if (separator == std::string::npos) {
+			parts.push_back(path.substr(start));
+			break;
+		}
 
-        if (separator == std::string::npos) {
-            parts.push_back(path.substr(start));
-            break;
-        }
+		if (separator > start) {
+			parts.push_back(path.substr(start, separator - start));
+		}
 
-        if (separator > start) {
-            parts.push_back(
-                path.substr(start, separator - start));
-        }
+		start = separator + 1;
+	}
 
-        start = separator + 1;
-    }
-
-    return parts;
+	return parts;
 }
 
-bool matchPath(
-    const std::string& route,
-    const std::string& target,
-    HttpRouter::Parameters& parameters)
+bool matchPath(const std::string &route, const std::string &target,
+               HttpRouter::Parameters &parameters)
 {
-    const auto routeParts = splitPath(route);
-    const auto targetParts = splitPath(target);
+	const auto routeParts = splitPath(route);
+	const auto targetParts = splitPath(target);
 
-    if (routeParts.size() != targetParts.size()) {
-        return false;
-    }
+	if (routeParts.size() != targetParts.size()) {
+		return false;
+	}
 
-    for (std::size_t i = 0; i < routeParts.size(); ++i) {
-        const auto& routePart = routeParts[i];
-        const auto& targetPart = targetParts[i];
+	for (std::size_t i = 0; i < routeParts.size(); ++i) {
+		const auto &routePart = routeParts[i];
+		const auto &targetPart = targetParts[i];
 
-        if (routePart.size() >= 2 &&
-            routePart.front() == '{' &&
-            routePart.back() == '}') {
-            const auto parameterName =
-                routePart.substr(
-                    1,
-                    routePart.size() - 2);
+		if (routePart.size() >= 2 && routePart.front() == '{' && routePart.back() == '}') {
+			const auto parameterName = routePart.substr(1, routePart.size() - 2);
 
-            parameters.emplace(
-                parameterName,
-                targetPart);
+			parameters.emplace(parameterName, targetPart);
 
-            continue;
-        }
+			continue;
+		}
 
-        if (routePart != targetPart) {
-            return false;
-        }
-    }
+		if (routePart != targetPart) {
+			return false;
+		}
+	}
 
-    return true;
+	return true;
 }
 
 } // namespace
 
-void HttpRouter::get(
-    std::string path,
-    Handler handler)
+void HttpRouter::get(std::string path, Handler handler)
 {
-    m_getRoutes.emplace(
-        std::move(path),
-        std::move(handler));
+	m_getRoutes.emplace(std::move(path), std::move(handler));
 }
 
-HttpRouter::Response HttpRouter::handle(
-    const Request& request) const
+HttpRouter::Response HttpRouter::handle(const Request &request) const
 {
-    Response response{
-        boost::beast::http::status::not_found,
-        request.version()
-    };
+	Response response{boost::beast::http::status::not_found, request.version()};
 
-    response.set(
-        boost::beast::http::field::content_type,
-        "text/plain");
+	response.set(boost::beast::http::field::content_type, "text/plain");
 
-    if (request.method() != boost::beast::http::verb::get) {
-        response.prepare_payload();
-        return response;
-    }
+	if (request.method() != boost::beast::http::verb::get) {
+		response.prepare_payload();
+		return response;
+	}
 
-    const std::string target(request.target());
+	const std::string target(request.target());
 
-    const auto queryPosition = target.find('?');
+	const auto queryPosition = target.find('?');
 
-    const std::string path =
-            queryPosition == std::string::npos
-                ? target
-                : target.substr(0, queryPosition);
+	const std::string path =
+	    queryPosition == std::string::npos ? target : target.substr(0, queryPosition);
 
-    QueryParameters queryParameters;
+	QueryParameters queryParameters;
 
-    if (queryPosition != std::string::npos) {
-        const auto query =
-            target.substr(queryPosition + 1);
+	if (queryPosition != std::string::npos) {
+		const auto query = target.substr(queryPosition + 1);
 
-        const auto separator = query.find('=');
+		const auto separator = query.find('=');
 
-        if (separator != std::string::npos) {
-            queryParameters.emplace(
-                query.substr(0, separator),
-                query.substr(separator + 1));
-        }
-    }
+		if (separator != std::string::npos) {
+			queryParameters.emplace(query.substr(0, separator), query.substr(separator + 1));
+		}
+	}
 
-    for (const auto& [route, handler] : m_getRoutes) {
-        Parameters parameters;
+	for (const auto &[route, handler] : m_getRoutes) {
+		Parameters parameters;
 
-        if (!matchPath(route, path, parameters)){
-            continue;
-        }
+		if (!matchPath(route, path, parameters)) {
+			continue;
+		}
 
-        response = handler(
-            request,
-            parameters,
-            queryParameters);
+		response = handler(request, parameters, queryParameters);
 
-        response.prepare_payload();
+		response.prepare_payload();
 
-        return response;
-    }
+		return response;
+	}
 
-    response.prepare_payload();
-    return response;
+	response.prepare_payload();
+	return response;
 }
 
 } // namespace api

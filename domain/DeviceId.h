@@ -6,9 +6,9 @@ namespace domain {
 
 struct DeviceId
 {
-    std::string value;
+	std::string value;
 
-    bool operator==(const DeviceId&) const = default;
+	bool operator==(const DeviceId &) const = default;
 };
 
 } // namespace domain

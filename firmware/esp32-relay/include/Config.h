@@ -39,8 +39,8 @@ constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000;
 constexpr uint32_t MQTT_RETRY_INTERVAL_MS = 5000;
 
 // ---- Time synchronization ----
-constexpr const char* NTP_SERVER_PRIMARY = "pool.ntp.org";
-constexpr const char* NTP_SERVER_SECONDARY = "time.google.com";
+constexpr const char *NTP_SERVER_PRIMARY = "pool.ntp.org";
+constexpr const char *NTP_SERVER_SECONDARY = "time.google.com";
 
 // Sanity floor used to decide whether the system clock reflects a real NTP
 // sync (2024-01-01T00:00:00Z) rather than the ESP32's power-on epoch. This

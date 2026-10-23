@@ -14,16 +14,14 @@ namespace application {
 
 class MeasurementQueryService
 {
-public:
-    explicit MeasurementQueryService(
-        database::MeasurementRepository& repository);
+  public:
+	explicit MeasurementQueryService(database::MeasurementRepository &repository);
 
-    std::vector<database::MeasurementRecord> findByDevice(
-        const std::string& deviceId,
-        std::size_t limit) const;
+	std::vector<database::MeasurementRecord> findByDevice(const std::string &deviceId,
+	                                                      std::size_t limit) const;
 
-private:
-    database::MeasurementRepository& m_repository;
+  private:
+	database::MeasurementRepository &m_repository;
 };
 
 } // namespace application

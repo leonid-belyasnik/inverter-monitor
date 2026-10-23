@@ -11,33 +11,33 @@ using PGresult = struct pg_result;
 
 class PostgresResult
 {
-public:
-    // fallbackError is reported by errorMessage() when result is null.
-    explicit PostgresResult(PGresult* result, std::string fallbackError = {});
+  public:
+	// fallbackError is reported by errorMessage() when result is null.
+	explicit PostgresResult(PGresult *result, std::string fallbackError = {});
 
-    bool isOk() const;
-    
-    int rowCount() const;
-    int columnCount() const;
-    const char* value(int row, int column) const;
-    bool isNull(int row, int column) const;
+	bool isOk() const;
 
-    const char* errorMessage() const;
-    // Empty when the server did not report a SQLSTATE.
-    std::string sqlState() const;
+	int rowCount() const;
+	int columnCount() const;
+	const char *value(int row, int column) const;
+	bool isNull(int row, int column) const;
 
-    PGresult* get() const;
+	const char *errorMessage() const;
+	// Empty when the server did not report a SQLSTATE.
+	std::string sqlState() const;
 
-private:
-    struct ResultDeleter
-    {
-        void operator()(PGresult* result) const;
-    };
+	PGresult *get() const;
 
-    using ResultPtr = std::unique_ptr<PGresult, ResultDeleter>;
+  private:
+	struct ResultDeleter
+	{
+		void operator()(PGresult *result) const;
+	};
 
-    ResultPtr m_result;
-    std::string m_fallbackError;
+	using ResultPtr = std::unique_ptr<PGresult, ResultDeleter>;
+
+	ResultPtr m_result;
+	std::string m_fallbackError;
 };
 
 } // namespace database

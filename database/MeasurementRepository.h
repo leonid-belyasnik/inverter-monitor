@@ -15,28 +15,25 @@ class PostgresConnection;
 
 struct DatabaseError
 {
-    std::string message;
-    // Empty when the server did not report a SQLSTATE.
-    std::string sqlState;
+	std::string message;
+	// Empty when the server did not report a SQLSTATE.
+	std::string sqlState;
 };
 
 class MeasurementRepository
 {
-public:
-    explicit MeasurementRepository(PostgresConnection& connection);
+  public:
+	explicit MeasurementRepository(PostgresConnection &connection);
 
-    // Returns 0 on failure; the cause is stored in error when it is not null.
-    std::int64_t save(
-        const domain::DeviceId& deviceId,
-        const domain::Measurement& measurement,
-        DatabaseError* error = nullptr);
+	// Returns 0 on failure; the cause is stored in error when it is not null.
+	std::int64_t save(const domain::DeviceId &deviceId, const domain::Measurement &measurement,
+	                  DatabaseError *error = nullptr);
 
-    std::vector<MeasurementRecord> findByDevice(
-        const domain::DeviceId& deviceId,
-        std::size_t limit);
+	std::vector<MeasurementRecord> findByDevice(const domain::DeviceId &deviceId,
+	                                            std::size_t limit);
 
-private:
-    PostgresConnection& m_connection;
+  private:
+	PostgresConnection &m_connection;
 };
 
 } // namespace database

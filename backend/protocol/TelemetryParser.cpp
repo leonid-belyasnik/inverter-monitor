@@ -9,139 +9,123 @@
 
 namespace {
 
-std::optional<std::chrono::system_clock::time_point>
-parseTimestamp(const std::string_view value)
+std::optional<std::chrono::system_clock::time_point> parseTimestamp(const std::string_view value)
 {
-    std::tm tm{};
-    std::istringstream stream{std::string(value)};
+	std::tm tm{};
+	std::istringstream stream{std::string(value)};
 
-    stream >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+	stream >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
 
-    if (stream.fail()) {
-        return std::nullopt;
-    }
+	if (stream.fail()) {
+		return std::nullopt;
+	}
 
-    if (stream.peek() != '.') {
-        return std::nullopt;
-    }
+	if (stream.peek() != '.') {
+		return std::nullopt;
+	}
 
-    stream.get();
+	stream.get();
 
-    std::string fractional;
-    stream >> fractional;
+	std::string fractional;
+	stream >> fractional;
 
-    if (stream.fail() || fractional.empty() || fractional.back() != 'Z') {
-        return std::nullopt;
-    }
+	if (stream.fail() || fractional.empty() || fractional.back() != 'Z') {
+		return std::nullopt;
+	}
 
-    fractional.pop_back();
+	fractional.pop_back();
 
-    if (fractional.empty() || fractional.size() > 3) {
-        return std::nullopt;
-    }
+	if (fractional.empty() || fractional.size() > 3) {
+		return std::nullopt;
+	}
 
-    while (fractional.size() < 3) {
-        fractional += '0';
-    }
+	while (fractional.size() < 3) {
+		fractional += '0';
+	}
 
-    const int milliseconds = std::stoi(fractional);
+	const int milliseconds = std::stoi(fractional);
 
-    const std::time_t seconds = timegm(&tm);
+	const std::time_t seconds = timegm(&tm);
 
-    if (seconds == static_cast<std::time_t>(-1)) {
-        return std::nullopt;
-    }
+	if (seconds == static_cast<std::time_t>(-1)) {
+		return std::nullopt;
+	}
 
-    return std::chrono::system_clock::from_time_t(seconds)
-        + std::chrono::milliseconds(milliseconds);
+	return std::chrono::system_clock::from_time_t(seconds) +
+	       std::chrono::milliseconds(milliseconds);
 }
 
 // Absent and null fields yield an empty optional. Any other non-numeric
 // value throws, so the whole payload is rejected.
-std::optional<double> optionalNumber(
-    const boost::json::object& object,
-    const std::string_view key)
+std::optional<double> optionalNumber(const boost::json::object &object, const std::string_view key)
 {
-    const auto* value = object.if_contains(key);
+	const auto *value = object.if_contains(key);
 
-    if (value == nullptr || value->is_null()) {
-        return std::nullopt;
-    }
+	if (value == nullptr || value->is_null()) {
+		return std::nullopt;
+	}
 
-    return value->to_number<double>();
+	return value->to_number<double>();
 }
 
 // Absent and null fields yield an empty optional. Any other non-boolean
 // value throws, so the whole payload is rejected.
-std::optional<bool> optionalBool(
-    const boost::json::object& object,
-    const std::string_view key)
+std::optional<bool> optionalBool(const boost::json::object &object, const std::string_view key)
 {
-    const auto* value = object.if_contains(key);
+	const auto *value = object.if_contains(key);
 
-    if (value == nullptr || value->is_null()) {
-        return std::nullopt;
-    }
+	if (value == nullptr || value->is_null()) {
+		return std::nullopt;
+	}
 
-    return value->as_bool();
+	return value->as_bool();
 }
 
 } // namespace
 
 namespace protocol {
 
-std::optional<domain::Measurement> TelemetryParser::parse(
-    const std::string_view payload) const
+std::optional<domain::Measurement> TelemetryParser::parse(const std::string_view payload) const
 {
-    try {
-        const auto root = boost::json::parse(payload);
+	try {
+		const auto root = boost::json::parse(payload);
 
-        if (!root.is_object()) {
-            return std::nullopt;
-        }
+		if (!root.is_object()) {
+			return std::nullopt;
+		}
 
-        const auto& object = root.as_object();
+		const auto &object = root.as_object();
 
-        const auto& measurement =
-            object.at("measurement").as_object();
+		const auto &measurement = object.at("measurement").as_object();
 
-        domain::Measurement result;
+		domain::Measurement result;
 
-        result.pvPower =
-            optionalNumber(measurement, "pv_power_w");
+		result.pvPower = optionalNumber(measurement, "pv_power_w");
 
-        result.gridPower =
-            optionalNumber(measurement, "grid_power_w");
+		result.gridPower = optionalNumber(measurement, "grid_power_w");
 
-        result.batteryPower =
-            measurement.at("battery_power_w").to_number<double>();
+		result.batteryPower = measurement.at("battery_power_w").to_number<double>();
 
-        result.loadPower =
-            optionalNumber(measurement, "load_power_w");
+		result.loadPower = optionalNumber(measurement, "load_power_w");
 
-        result.batterySoc =
-            measurement.at("battery_soc_pct").to_number<double>();
+		result.batterySoc = measurement.at("battery_soc_pct").to_number<double>();
 
-        result.gridVoltage =
-            optionalNumber(measurement, "grid_voltage_v");
+		result.gridVoltage = optionalNumber(measurement, "grid_voltage_v");
 
-        result.gridRelayOn =
-            optionalBool(measurement, "grid_relay_on");
+		result.gridRelayOn = optionalBool(measurement, "grid_relay_on");
 
-        const auto measuredAt =
-            parseTimestamp(object.at("measured_at").as_string());
+		const auto measuredAt = parseTimestamp(object.at("measured_at").as_string());
 
-        if (!measuredAt) {
-            return std::nullopt;
-        }
+		if (!measuredAt) {
+			return std::nullopt;
+		}
 
-        result.measuredAt = *measuredAt;
+		result.measuredAt = *measuredAt;
 
-        return result;
-    }
-    catch (const std::exception&) {
-        return std::nullopt;
-    }
+		return result;
+	} catch (const std::exception &) {
+		return std::nullopt;
+	}
 }
 
 } // namespace protocol

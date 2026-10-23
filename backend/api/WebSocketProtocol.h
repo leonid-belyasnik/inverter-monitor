@@ -7,10 +7,9 @@ namespace api {
 
 struct SubscribeCommand
 {
-    std::string deviceId;
+	std::string deviceId;
 };
 
-std::optional<SubscribeCommand>
-parseSubscribeCommand(const std::string& message);
+std::optional<SubscribeCommand> parseSubscribeCommand(const std::string &message);
 
-}
+} // namespace api

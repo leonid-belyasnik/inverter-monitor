@@ -11,13 +11,13 @@ namespace domain {
 struct Measurement
 {
 	std::chrono::system_clock::time_point measuredAt;
-    std::optional<double> pvPower;
-    std::optional<double> gridPower;
-    double batteryPower;
-    std::optional<double> loadPower;
-    double batterySoc;
-    std::optional<double> gridVoltage;
-    std::optional<bool> gridRelayOn;
+	std::optional<double> pvPower;
+	std::optional<double> gridPower;
+	double batteryPower;
+	std::optional<double> loadPower;
+	double batterySoc;
+	std::optional<double> gridVoltage;
+	std::optional<bool> gridRelayOn;
 };
 
 } // namespace domain

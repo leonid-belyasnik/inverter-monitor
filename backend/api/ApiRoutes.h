@@ -12,10 +12,9 @@ class HttpRouter;
 
 class ApiRoutes
 {
-public:
-    static void registerRoutes(
-        HttpRouter& router,
-        application::MeasurementQueryService& queryService);
+  public:
+	static void registerRoutes(HttpRouter &router,
+	                           application::MeasurementQueryService &queryService);
 };
 
 } // namespace api

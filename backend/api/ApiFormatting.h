@@ -9,11 +9,10 @@
 
 namespace api {
 
-std::string formatTimestamp(
-    const std::chrono::system_clock::time_point& timePoint);
+std::string formatTimestamp(const std::chrono::system_clock::time_point &timePoint);
 
 // Measurement JSON shared by REST and WebSocket. Empty optional values are
 // serialized as null.
-boost::json::object formatMeasurement(const domain::Measurement& measurement);
+boost::json::object formatMeasurement(const domain::Measurement &measurement);
 
-}
+} // namespace api

@@ -14,7 +14,7 @@ namespace api {
 WebSocketServer::WebSocketServer(const char *address, unsigned short port)
     : m_ioContext(),
       m_acceptor(m_ioContext,
-	             boost::asio::ip::tcp::endpoint{boost::asio::ip::make_address(address), port}),
+                 boost::asio::ip::tcp::endpoint{boost::asio::ip::make_address(address), port}),
       m_address(address), m_port(port)
 {
 }

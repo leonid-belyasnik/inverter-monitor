@@ -4,280 +4,237 @@
 #include <cstdint>
 #include <ctime>
 #include <iomanip>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <optional>
 
 #include <database/PostgresConnection.h>
 #include <database/PostgresResult.h>
 
 namespace database {
 
-namespace
+namespace {
+
+std::string formatTimestamp(const std::chrono::system_clock::time_point time)
 {
+	const auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(time);
 
-std::string formatTimestamp(
-    const std::chrono::system_clock::time_point time)
-{
-    const auto seconds =
-        std::chrono::time_point_cast<std::chrono::seconds>(time);
+	const auto milliseconds =
+	    std::chrono::duration_cast<std::chrono::milliseconds>(time - seconds).count();
 
-    const auto milliseconds =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            time - seconds).count();
+	const auto timeValue = std::chrono::system_clock::to_time_t(seconds);
 
-    const auto timeValue =
-        std::chrono::system_clock::to_time_t(seconds);
+	std::tm tm{};
+	gmtime_r(&timeValue, &tm);
 
-    std::tm tm{};
-    gmtime_r(&timeValue, &tm);
+	std::ostringstream stream;
+	stream << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(3)
+	       << milliseconds << 'Z';
 
-    std::ostringstream stream;
-    stream << std::put_time(&tm, "%Y-%m-%d %H:%M:%S")
-           << '.'
-           << std::setfill('0')
-           << std::setw(3)
-           << milliseconds
-           << 'Z';
-
-    return stream.str();
+	return stream.str();
 }
 
 std::string formatDouble(const double value)
 {
-    std::ostringstream stream;
-    stream << std::setprecision(17) << value;
+	std::ostringstream stream;
+	stream << std::setprecision(17) << value;
 
-    return stream.str();
+	return stream.str();
 }
 
-std::optional<std::string> formatOptionalDouble(const std::optional<double>& value)
+std::optional<std::string> formatOptionalDouble(const std::optional<double> &value)
 {
-    if (!value) {
-        return std::nullopt;
-    }
+	if (!value) {
+		return std::nullopt;
+	}
 
-    return formatDouble(*value);
+	return formatDouble(*value);
 }
 
-std::optional<std::string> formatOptionalBool(const std::optional<bool>& value)
+std::optional<std::string> formatOptionalBool(const std::optional<bool> &value)
 {
-    if (!value) {
-        return std::nullopt;
-    }
+	if (!value) {
+		return std::nullopt;
+	}
 
-    return *value ? "true" : "false";
+	return *value ? "true" : "false";
 }
 
 // A null pointer is passed to libpq as SQL NULL.
-const char* parameterValue(const std::optional<std::string>& value)
+const char *parameterValue(const std::optional<std::string> &value)
 {
-    return value ? value->c_str() : nullptr;
+	return value ? value->c_str() : nullptr;
 }
 
-std::optional<double> optionalDouble(
-    const PostgresResult& result,
-    const int row,
-    const int column)
+std::optional<double> optionalDouble(const PostgresResult &result, const int row, const int column)
 {
-    if (result.isNull(row, column)) {
-        return std::nullopt;
-    }
+	if (result.isNull(row, column)) {
+		return std::nullopt;
+	}
 
-    return std::stod(result.value(row, column));
+	return std::stod(result.value(row, column));
 }
 
 // PostgreSQL returns boolean values as "t" or "f" in text format.
-std::optional<bool> optionalBool(
-    const PostgresResult& result,
-    const int row,
-    const int column)
+std::optional<bool> optionalBool(const PostgresResult &result, const int row, const int column)
 {
-    if (result.isNull(row, column)) {
-        return std::nullopt;
-    }
+	if (result.isNull(row, column)) {
+		return std::nullopt;
+	}
 
-    return std::string_view(result.value(row, column)) == "t";
+	return std::string_view(result.value(row, column)) == "t";
 }
 
-std::optional<std::chrono::system_clock::time_point>
-parseTimestamp(const char* value)
+std::optional<std::chrono::system_clock::time_point> parseTimestamp(const char *value)
 {
-    std::tm tm{};
-    int milliseconds = 0;
+	std::tm tm{};
+	int milliseconds = 0;
 
-    std::istringstream stream{value};
+	std::istringstream stream{value};
 
-    stream >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+	stream >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
 
-    if (stream.fail()) {
-        return std::nullopt;
-    }
+	if (stream.fail()) {
+		return std::nullopt;
+	}
 
-    if (stream.peek() == '.') {
-        stream.get();
+	if (stream.peek() == '.') {
+		stream.get();
 
-        std::string fractional;
-        stream >> fractional;
+		std::string fractional;
+		stream >> fractional;
 
-        if (fractional.empty()) {
-            return std::nullopt;
-        }
+		if (fractional.empty()) {
+			return std::nullopt;
+		}
 
-        const auto plusPosition = fractional.find('+');
+		const auto plusPosition = fractional.find('+');
 
-        if (plusPosition != std::string::npos) {
-            fractional = fractional.substr(0, plusPosition);
-        }
+		if (plusPosition != std::string::npos) {
+			fractional = fractional.substr(0, plusPosition);
+		}
 
-        if (fractional.empty() || fractional.size() > 3) {
-            return std::nullopt;
-        }
+		if (fractional.empty() || fractional.size() > 3) {
+			return std::nullopt;
+		}
 
-        while (fractional.size() < 3) {
-            fractional += '0';
-        }
+		while (fractional.size() < 3) {
+			fractional += '0';
+		}
 
-        milliseconds = std::stoi(fractional);
-    }
+		milliseconds = std::stoi(fractional);
+	}
 
-    const std::time_t seconds = timegm(&tm);
+	const std::time_t seconds = timegm(&tm);
 
-    if (seconds == static_cast<std::time_t>(-1)) {
-        return std::nullopt;
-    }
+	if (seconds == static_cast<std::time_t>(-1)) {
+		return std::nullopt;
+	}
 
-    return std::chrono::system_clock::from_time_t(seconds)
-        + std::chrono::milliseconds(milliseconds);
+	return std::chrono::system_clock::from_time_t(seconds) +
+	       std::chrono::milliseconds(milliseconds);
 }
 
-}
+} // namespace
 
-MeasurementRepository::MeasurementRepository(PostgresConnection& connection)
+MeasurementRepository::MeasurementRepository(PostgresConnection &connection)
     : m_connection(connection)
 {
 }
 
-std::int64_t MeasurementRepository::save(
-    const domain::DeviceId& deviceId,
-    const domain::Measurement& measurement,
-    DatabaseError* error)
+std::int64_t MeasurementRepository::save(const domain::DeviceId &deviceId,
+                                         const domain::Measurement &measurement,
+                                         DatabaseError *error)
 {
-    const std::string measuredAt = formatTimestamp(measurement.measuredAt);
-    const auto pvPower = formatOptionalDouble(measurement.pvPower);
-    const auto gridPower = formatOptionalDouble(measurement.gridPower);
-    const std::string batteryPower = formatDouble(measurement.batteryPower);
-    const auto loadPower = formatOptionalDouble(measurement.loadPower);
-    const std::string batterySoc = formatDouble(measurement.batterySoc);
-    const auto gridVoltage = formatOptionalDouble(measurement.gridVoltage);
-    const auto gridRelayOn = formatOptionalBool(measurement.gridRelayOn);
+	const std::string measuredAt = formatTimestamp(measurement.measuredAt);
+	const auto pvPower = formatOptionalDouble(measurement.pvPower);
+	const auto gridPower = formatOptionalDouble(measurement.gridPower);
+	const std::string batteryPower = formatDouble(measurement.batteryPower);
+	const auto loadPower = formatOptionalDouble(measurement.loadPower);
+	const std::string batterySoc = formatDouble(measurement.batterySoc);
+	const auto gridVoltage = formatOptionalDouble(measurement.gridVoltage);
+	const auto gridRelayOn = formatOptionalBool(measurement.gridRelayOn);
 
-    const char* values[] = {
-        deviceId.value.c_str(),
-        measuredAt.c_str(),
-        parameterValue(pvPower),
-        parameterValue(gridPower),
-        batteryPower.c_str(),
-        parameterValue(loadPower),
-        batterySoc.c_str(),
-        parameterValue(gridVoltage),
-        parameterValue(gridRelayOn)
-    };
+	const char *values[] = {
+	    deviceId.value.c_str(),    measuredAt.c_str(),          parameterValue(pvPower),
+	    parameterValue(gridPower), batteryPower.c_str(),        parameterValue(loadPower),
+	    batterySoc.c_str(),        parameterValue(gridVoltage), parameterValue(gridRelayOn)};
 
-    const auto result = m_connection.executeParams(
-        "INSERT INTO measurements "
-        "(device_id, measured_at, pv_power, grid_power, battery_power, load_power, battery_soc, "
-        "grid_voltage, grid_relay_on) "
-        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "
-        "RETURNING id",
-        9,
-        values
-    );
+	const auto result = m_connection.executeParams(
+	    "INSERT INTO measurements "
+	    "(device_id, measured_at, pv_power, grid_power, battery_power, load_power, battery_soc, "
+	    "grid_voltage, grid_relay_on) "
+	    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "
+	    "RETURNING id",
+	    9, values);
 
-    if (!result.isOk())
-    {
-        if (error) {
-            *error = DatabaseError{result.errorMessage(), result.sqlState()};
-        }
+	if (!result.isOk()) {
+		if (error) {
+			*error = DatabaseError{result.errorMessage(), result.sqlState()};
+		}
 
-        return 0;
-    }
+		return 0;
+	}
 
-    if (result.rowCount() != 1)
-    {
-        if (error) {
-            *error = DatabaseError{
-                "INSERT returned " + std::to_string(result.rowCount()) + " rows",
-                {}};
-        }
+	if (result.rowCount() != 1) {
+		if (error) {
+			*error =
+			    DatabaseError{"INSERT returned " + std::to_string(result.rowCount()) + " rows", {}};
+		}
 
-        return 0;
-    }
+		return 0;
+	}
 
-    return std::stoll(result.value(0, 0));
+	return std::stoll(result.value(0, 0));
 }
 
-std::vector<MeasurementRecord> MeasurementRepository::findByDevice(
-    const domain::DeviceId& deviceId,
-    const std::size_t limit)
+std::vector<MeasurementRecord> MeasurementRepository::findByDevice(const domain::DeviceId &deviceId,
+                                                                   const std::size_t limit)
 {
-    const std::string limitValue = std::to_string(limit);
+	const std::string limitValue = std::to_string(limit);
 
-    const char* values[] = {
-        deviceId.value.c_str(),
-        limitValue.c_str()
-    };
+	const char *values[] = {deviceId.value.c_str(), limitValue.c_str()};
 
-    const auto result = m_connection.executeParams(
-        "SELECT device_id, measured_at, pv_power, grid_power, "
-        "battery_power, load_power, battery_soc, grid_voltage, grid_relay_on "
-        "FROM measurements "
-        "WHERE device_id = $1 "
-        "ORDER BY measured_at DESC "
-        "LIMIT $2",
-        2,
-        values
-    );
+	const auto result = m_connection.executeParams(
+	    "SELECT device_id, measured_at, pv_power, grid_power, "
+	    "battery_power, load_power, battery_soc, grid_voltage, grid_relay_on "
+	    "FROM measurements "
+	    "WHERE device_id = $1 "
+	    "ORDER BY measured_at DESC "
+	    "LIMIT $2",
+	    2, values);
 
-    std::vector<MeasurementRecord> records;
+	std::vector<MeasurementRecord> records;
 
-    if (!result.isOk()) {
-        return records;
-    }
+	if (!result.isOk()) {
+		return records;
+	}
 
-    for (int row = 0; row < result.rowCount(); ++row) {
-        MeasurementRecord record;
+	for (int row = 0; row < result.rowCount(); ++row) {
+		MeasurementRecord record;
 
-        record.deviceId = domain::DeviceId{
-            result.value(row, 0)};
+		record.deviceId = domain::DeviceId{result.value(row, 0)};
 
-        const auto measuredAt = parseTimestamp(result.value(row, 1));
+		const auto measuredAt = parseTimestamp(result.value(row, 1));
 
-        if (!measuredAt) {
-            continue;
-        }
+		if (!measuredAt) {
+			continue;
+		}
 
-        record.measurement.measuredAt = *measuredAt;
-        record.measurement.pvPower =
-            optionalDouble(result, row, 2);
-        record.measurement.gridPower =
-            optionalDouble(result, row, 3);
-        record.measurement.batteryPower =
-            std::stod(result.value(row, 4));
-        record.measurement.loadPower =
-            optionalDouble(result, row, 5);
-        record.measurement.batterySoc =
-            std::stod(result.value(row, 6));
-        record.measurement.gridVoltage =
-            optionalDouble(result, row, 7);
-        record.measurement.gridRelayOn =
-            optionalBool(result, row, 8);
+		record.measurement.measuredAt = *measuredAt;
+		record.measurement.pvPower = optionalDouble(result, row, 2);
+		record.measurement.gridPower = optionalDouble(result, row, 3);
+		record.measurement.batteryPower = std::stod(result.value(row, 4));
+		record.measurement.loadPower = optionalDouble(result, row, 5);
+		record.measurement.batterySoc = std::stod(result.value(row, 6));
+		record.measurement.gridVoltage = optionalDouble(result, row, 7);
+		record.measurement.gridRelayOn = optionalBool(result, row, 8);
 
-        records.push_back(std::move(record));
-    }
+		records.push_back(std::move(record));
+	}
 
-    return records;
+	return records;
 }
 
 } // namespace database

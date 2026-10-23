@@ -7,26 +7,25 @@
 
 TEST(TelemetryAdapterTest, ParsesDeviceIdFromValidTelemetryTopic)
 {
-    const auto deviceId = mqtt::TelemetryAdapter::deviceIdFromTopic(
-        "v1/devices/deye-001/telemetry");
+	const auto deviceId =
+	    mqtt::TelemetryAdapter::deviceIdFromTopic("v1/devices/deye-001/telemetry");
 
-    ASSERT_TRUE(deviceId.has_value());
-    EXPECT_EQ(deviceId->value, "deye-001");
+	ASSERT_TRUE(deviceId.has_value());
+	EXPECT_EQ(deviceId->value, "deye-001");
 }
 
 TEST(TelemetryAdapterTest, RejectsInvalidTelemetryTopic)
 {
-    EXPECT_FALSE(mqtt::TelemetryAdapter::deviceIdFromTopic(
-        "v1/devices/deye-001/status").has_value());
-    EXPECT_FALSE(mqtt::TelemetryAdapter::deviceIdFromTopic(
-        "v1/devices//telemetry").has_value());
-    EXPECT_FALSE(mqtt::TelemetryAdapter::deviceIdFromTopic(
-        "v1/devices/deye-001/other/telemetry").has_value());
+	EXPECT_FALSE(
+	    mqtt::TelemetryAdapter::deviceIdFromTopic("v1/devices/deye-001/status").has_value());
+	EXPECT_FALSE(mqtt::TelemetryAdapter::deviceIdFromTopic("v1/devices//telemetry").has_value());
+	EXPECT_FALSE(mqtt::TelemetryAdapter::deviceIdFromTopic("v1/devices/deye-001/other/telemetry")
+	                 .has_value());
 }
 
 TEST(TelemetryAdapterTest, AdaptsValidTopicAndPayloadForIngestion)
 {
-    const std::string payload = R"json(
+	const std::string payload = R"json(
 {
     "measured_at": "2026-09-24T18:50:00.316Z",
     "measurement": {
@@ -39,17 +38,15 @@ TEST(TelemetryAdapterTest, AdaptsValidTopicAndPayloadForIngestion)
 }
 )json";
 
-    const protocol::TelemetryParser parser;
-    const mqtt::TelemetryAdapter adapter(parser);
-    const auto ingested = adapter.adapt(
-        "v1/devices/deye-001/telemetry",
-        payload);
+	const protocol::TelemetryParser parser;
+	const mqtt::TelemetryAdapter adapter(parser);
+	const auto ingested = adapter.adapt("v1/devices/deye-001/telemetry", payload);
 
-    ASSERT_TRUE(ingested.has_value());
-    EXPECT_EQ(ingested->deviceId.value, "deye-001");
-    EXPECT_DOUBLE_EQ(ingested->measurement.pvPower.value(), 1924.66);
-    EXPECT_DOUBLE_EQ(ingested->measurement.gridPower.value(), -200.00);
-    EXPECT_DOUBLE_EQ(ingested->measurement.batteryPower, -449.73);
-    EXPECT_DOUBLE_EQ(ingested->measurement.loadPower.value(), 1274.93);
-    EXPECT_DOUBLE_EQ(ingested->measurement.batterySoc, 75.16);
+	ASSERT_TRUE(ingested.has_value());
+	EXPECT_EQ(ingested->deviceId.value, "deye-001");
+	EXPECT_DOUBLE_EQ(ingested->measurement.pvPower.value(), 1924.66);
+	EXPECT_DOUBLE_EQ(ingested->measurement.gridPower.value(), -200.00);
+	EXPECT_DOUBLE_EQ(ingested->measurement.batteryPower, -449.73);
+	EXPECT_DOUBLE_EQ(ingested->measurement.loadPower.value(), 1274.93);
+	EXPECT_DOUBLE_EQ(ingested->measurement.batterySoc, 75.16);
 }

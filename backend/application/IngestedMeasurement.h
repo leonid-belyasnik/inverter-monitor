@@ -7,8 +7,8 @@ namespace application {
 
 struct IngestedMeasurement
 {
-    domain::DeviceId deviceId;
-    domain::Measurement measurement;
+	domain::DeviceId deviceId;
+	domain::Measurement measurement;
 };
 
 } // namespace application

@@ -6,9 +6,9 @@ namespace database {
 
 struct Migration
 {
-    int version;
-    std::string name;
-    std::string sql;
+	int version;
+	std::string name;
+	std::string sql;
 };
 
 } // namespace database
