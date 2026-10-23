@@ -48,6 +48,21 @@ add_test(
     COMMAND postgres_diagnostics_test
 )
 
+add_executable(error_classification_test
+    ErrorClassificationTest.cpp
+)
+
+target_link_libraries(error_classification_test
+    PRIVATE
+        database
+        GTest::gtest_main
+)
+
+add_test(
+    NAME ErrorClassificationTest
+    COMMAND error_classification_test
+)
+
 add_executable(telemetry_parser_test
     TelemetryParserTest.cpp
 )

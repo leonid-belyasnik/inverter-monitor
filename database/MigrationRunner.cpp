@@ -26,9 +26,35 @@ std::string migrationLabel(const Migration& migration)
     return "Migration " + std::to_string(migration.version) + " (" + migration.name + ")";
 }
 
+struct Failure
+{
+    std::string message;
+    ErrorKind kind = ErrorKind::Permanent;
+    std::string sqlState;
+};
+
+Failure queryFailure(
+    const PostgresConnection& connection,
+    const PostgresResult& result,
+    const std::string& prefix = {}
+)
+{
+    auto sqlState = result.sqlState();
+    const auto kind = classifyQueryFailure(sqlState, !connection.isOk());
+
+    return {prefix + trimmed(result.errorMessage()), kind, std::move(sqlState)};
+}
+
+void setFailure(MigrationResult& result, Failure failure)
+{
+    result.error = std::move(failure.message);
+    result.errorKind = failure.kind;
+    result.sqlState = std::move(failure.sqlState);
+}
+
 std::optional<std::set<int>> readAppliedVersions(
     const PostgresConnection& connection,
-    std::string& error
+    Failure& failure
 )
 {
     const auto existsResult = connection.execute(
@@ -36,7 +62,7 @@ std::optional<std::set<int>> readAppliedVersions(
     );
 
     if (!existsResult.isOk() || existsResult.rowCount() != 1) {
-        error = "Failed to check schema_migrations: " + trimmed(existsResult.errorMessage());
+        failure = queryFailure(connection, existsResult, "Failed to check schema_migrations: ");
         return std::nullopt;
     }
 
@@ -51,7 +77,7 @@ std::optional<std::set<int>> readAppliedVersions(
     );
 
     if (!versionsResult.isOk()) {
-        error = "Failed to read schema_migrations: " + trimmed(versionsResult.errorMessage());
+        failure = queryFailure(connection, versionsResult, "Failed to read schema_migrations: ");
         return std::nullopt;
     }
 
@@ -147,9 +173,11 @@ MigrationResult MigrationRunner::run()
         return result;
     }
 
-    auto applied = readAppliedVersions(m_connection, result.error);
+    Failure readFailure;
+    auto applied = readAppliedVersions(m_connection, readFailure);
 
     if (!applied) {
+        setFailure(result, std::move(readFailure));
         return result;
     }
 
@@ -169,22 +197,23 @@ MigrationResult MigrationRunner::run()
 
         const auto label = migrationLabel(migration);
 
-        auto fail = [&](const std::string& step, const std::string& reason) {
+        auto fail = [&](const std::string& step, Failure failure) {
             m_connection.execute("ROLLBACK");
-            result.error = label + " failed " + step + ": " + reason;
+            failure.message = label + " failed " + step + ": " + failure.message;
+            setFailure(result, std::move(failure));
             return result;
         };
 
         if (const auto begin = m_connection.execute("BEGIN"); !begin.isOk()) {
-            return fail("to begin transaction", trimmed(begin.errorMessage()));
+            return fail("to begin transaction", queryFailure(m_connection, begin));
         }
 
         if (const auto timeout = m_connection.execute(setLockTimeout.c_str()); !timeout.isOk()) {
-            return fail("to set lock timeout", trimmed(timeout.errorMessage()));
+            return fail("to set lock timeout", queryFailure(m_connection, timeout));
         }
 
         if (const auto lock = m_connection.execute(acquireLock.c_str()); !lock.isOk()) {
-            return fail("to acquire migration lock", trimmed(lock.errorMessage()));
+            return fail("to acquire migration lock", queryFailure(m_connection, lock));
         }
 
         const auto createTable = m_connection.execute(
@@ -196,29 +225,29 @@ MigrationResult MigrationRunner::run()
         );
 
         if (!createTable.isOk()) {
-            return fail("to create schema_migrations", trimmed(createTable.errorMessage()));
+            return fail("to create schema_migrations", queryFailure(m_connection, createTable));
         }
 
-        std::string readError;
-        applied = readAppliedVersions(m_connection, readError);
+        Failure rereadFailure;
+        applied = readAppliedVersions(m_connection, rereadFailure);
 
         if (!applied) {
-            return fail("to re-read applied versions", readError);
+            return fail("to re-read applied versions", std::move(rereadFailure));
         }
 
-        if (const auto historyError = checkHistory(*applied, m_migrations); !historyError.empty()) {
-            return fail("history check", historyError);
+        if (auto historyError = checkHistory(*applied, m_migrations); !historyError.empty()) {
+            return fail("history check", Failure{std::move(historyError)});
         }
 
         if (applied->contains(migration.version)) {
             if (const auto commit = m_connection.execute("COMMIT"); !commit.isOk()) {
-                return fail("to commit", trimmed(commit.errorMessage()));
+                return fail("to commit", queryFailure(m_connection, commit));
             }
             continue;
         }
 
         if (const auto apply = m_connection.execute(migration.sql.c_str()); !apply.isOk()) {
-            return fail("to execute SQL", trimmed(apply.errorMessage()));
+            return fail("to execute SQL", queryFailure(m_connection, apply));
         }
 
         const auto versionText = std::to_string(migration.version);
@@ -231,11 +260,11 @@ MigrationResult MigrationRunner::run()
         );
 
         if (!record.isOk()) {
-            return fail("to record version", trimmed(record.errorMessage()));
+            return fail("to record version", queryFailure(m_connection, record));
         }
 
         if (const auto commit = m_connection.execute("COMMIT"); !commit.isOk()) {
-            return fail("to commit", trimmed(commit.errorMessage()));
+            return fail("to commit", queryFailure(m_connection, commit));
         }
 
         applied->insert(migration.version);

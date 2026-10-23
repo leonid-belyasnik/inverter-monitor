@@ -122,6 +122,24 @@ Rules for adding migrations:
 
 Migration tests run in a separate PostgreSQL schema per test with `search_path` set only to that schema, and drop it afterwards.
 
+#### Startup Retry (Stage 2A)
+
+`inverter-monitor` retries only the startup sequence "connect, then apply migrations" after a transient failure. The 60 s startup deadline is the main limit; `maxAttempts` (10) is a secondary cap. With the 1, 2, 4, 8, 10, 10… s backoff the deadline ends startup after at most 9 attempts, so logs report the attempt number and elapsed time, not "N of 10". The deadline limits the retry loop, not a single attempt: it is checked after a failed attempt (to decide whether the next one may start) and before each new attempt, and an attempt that has already started can run past it. Startup as a whole is therefore not guaranteed to finish within 60 s. Limits on a running attempt:
+
+* `connect_timeout` (5 s by default) applies to each address of the connection separately, not necessarily to the whole connection attempt. For example, a host name that resolves to both IPv6 and IPv4 addresses can take up to 5 s per address.
+* The wait for the migration advisory lock is limited by `lock_timeout` (30 s by default). The SQL of a migration has no overall timeout of its own.
+* A stop signal received during a blocking libpq call does not guarantee that the current attempt ends immediately. The signal handler only sets a flag, which is checked between attempts and every 100 ms while waiting before a retry.
+
+Error classification (`database/ErrorClassification.h`) uses structured data only, never the libpq message text:
+
+* Permanent: invalid connection parameters, a required but missing password (`PQconnectionNeedsPassword()`), and any SQLSTATE not listed as transient.
+* Transient: other connection failures, SQLSTATE class `08`, `57P01`–`57P03`, `53300`, `55P03`, `40001`, `40P01`.
+* `PQconnectionUsedPassword()` is not used: it only shows that the server asked for a password, so a rejected password cannot be told apart from a refusal after successful authentication. A wrong password is therefore retried until the deadline.
+
+Known limitation: when the execution of a migration's SQL ends with a lost connection, the cause is ambiguous (network failure, server restart, or a statement that crashes the server) and no SQLSTATE is available. It is classified as transient, so a migration that crashes the server may be retried until the deadline. A retry starts only after the previous client-side attempt has finished and its connection has been closed. That does not mean the server backend of the broken session has stopped: it may still be running the previous SQL for some time. The advisory lock only limits how long a new attempt waits for it (`lock_timeout`, a transient `55P03` on expiry); it is not a general timeout for SQL execution. Repeating the migration is safe for the schema: each migration is one transaction, and applied versions are re-read under the advisory lock, so a migration that did commit is skipped.
+
+Retry is not added to `PostgresConnection::execute()` or other generic query methods. An INSERT whose outcome is unknown (connection lost after the request was sent) must not be repeated automatically.
+
 ### API
 
 The API layer contains HTTP REST and WebSocket functionality.

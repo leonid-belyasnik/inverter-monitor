@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <csignal>
@@ -20,6 +21,7 @@
 #include <application/MeasurementQueryService.h>
 #include <application/TelemetryIngestionService.h>
 #include <database/DatabaseSchema.h>
+#include <database/ErrorClassification.h>
 #include <database/MeasurementRepository.h>
 #include <database/PostgresConnection.h>
 #include <mqtt/MqttClient.h>
@@ -128,31 +130,138 @@ std::string describeIngestionError(const application::IngestionError &error)
 	return description;
 }
 
+// Returns false if a stop signal arrived before the delay elapsed.
+bool waitUnlessStopped(const std::chrono::milliseconds delay)
+{
+	using Clock = std::chrono::steady_clock;
+	const auto until = Clock::now() + delay;
+
+	while (!stopRequested) {
+		const auto now = Clock::now();
+
+		if (now >= until) {
+			return true;
+		}
+
+		std::this_thread::sleep_for(
+		    std::min<Clock::duration>(until - now, std::chrono::milliseconds(100)));
+	}
+
+	return false;
+}
+
+// Connects and applies migrations, repeating both after transient failures.
+// The deadline limits the retry loop, not a single attempt: it decides whether
+// another attempt may start, and an attempt already running can exceed it.
+// A running attempt is limited only partly: connect_timeout applies to each
+// connection address separately, the migration lock wait is limited by
+// lock_timeout, and migration SQL has no overall timeout. A stop signal does
+// not interrupt a blocking libpq call; it is seen between attempts and while
+// waiting before a retry.
+std::unique_ptr<database::PostgresConnection>
+connectDatabase(const database::StartupRetryPolicy &policy)
+{
+	using Clock = std::chrono::steady_clock;
+	const auto start = Clock::now();
+	const auto elapsed = [&start] {
+		return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start);
+	};
+
+	for (int attempt = 1;; ++attempt) {
+		if (stopRequested) {
+			logMessage(LogLevel::Warning, "Database startup interrupted by a stop signal");
+			return nullptr;
+		}
+
+		if (attempt > 1 && elapsed() >= policy.deadline) {
+			logMessage(LogLevel::Error, "Database startup deadline of " +
+			                                std::to_string(policy.deadline.count()) +
+			                                " ms exceeded before attempt " + std::to_string(attempt));
+			return nullptr;
+		}
+
+		auto connection = std::make_unique<database::PostgresConnection>("");
+		std::string stage;
+		std::string reason;
+		database::ErrorKind kind = database::ErrorKind::Permanent;
+
+		if (connection->isOk()) {
+			database::DatabaseSchema schema(*connection);
+
+			if (schema.initialize()) {
+				logMessage(LogLevel::Info,
+				           "Database ready after " + std::to_string(attempt) + " attempt(s)");
+				return connection;
+			}
+
+			stage = "schema initialization";
+			reason = singleLine(schema.errorMessage());
+			kind = schema.errorKind();
+
+			if (!schema.sqlState().empty()) {
+				reason += " (SQLSTATE " + schema.sqlState() + ')';
+			}
+		} else {
+			stage = "connection";
+			reason = singleLine(connection->errorMessage());
+			kind = connection->failureKind();
+		}
+
+		connection.reset();
+
+		const auto decision = database::decideStartupRetry(policy, attempt, elapsed(), kind);
+		// The deadline normally ends startup before maxAttempts is reached, so
+		// the log reports the attempt number and elapsed time, not "N of max".
+		const std::string failure = "Database startup attempt " + std::to_string(attempt) +
+		                            " failed after " + std::to_string(elapsed().count()) +
+		                            " ms of the " + std::to_string(policy.deadline.count()) +
+		                            " ms startup deadline, during " + stage + " (" +
+		                            database::toString(kind) + " error): " + reason;
+
+		switch (decision.verdict) {
+		case database::RetryVerdict::Retry:
+			logMessage(LogLevel::Warning,
+			           failure + "; retrying in " + std::to_string(decision.delay.count()) + " ms");
+			break;
+		case database::RetryVerdict::PermanentFailure:
+			logMessage(LogLevel::Error, failure + "; not retrying");
+			return nullptr;
+		case database::RetryVerdict::AttemptsExhausted:
+			logMessage(LogLevel::Error, failure + "; giving up after " + std::to_string(attempt) +
+			                                " attempts");
+			return nullptr;
+		case database::RetryVerdict::DeadlineExceeded:
+			logMessage(LogLevel::Error, failure + "; giving up, the next attempt would start after the " +
+			                                std::to_string(policy.deadline.count()) +
+			                                " ms startup deadline");
+			return nullptr;
+		}
+
+		if (!waitUnlessStopped(decision.delay)) {
+			logMessage(LogLevel::Warning, "Database startup interrupted by a stop signal");
+			return nullptr;
+		}
+	}
+}
+
 } // namespace
 
 int main()
 {
+	std::signal(SIGINT, handleSignal);
+	std::signal(SIGTERM, handleSignal);
+
 	const std::string mqttHost = getEnvironment("MQTT_HOST", "localhost");
 
 	const int mqttPort = getEnvironmentInt("MQTT_PORT", 1883);
 
-	database::PostgresConnection databaseConnection("");
+	const auto databaseConnection = connectDatabase(database::StartupRetryPolicy{});
 
-	if (!databaseConnection.isOk()) {
-		logMessage(LogLevel::Error,
-		           "Database connection failed: " + singleLine(databaseConnection.errorMessage()));
+	if (!databaseConnection) {
 		return 1;
 	}
 
-	database::DatabaseSchema schema(databaseConnection);
-
-	if (!schema.initialize()) {
-		logMessage(LogLevel::Error,
-		           "Database schema initialization failed: " + singleLine(schema.errorMessage()));
-		return 1;
-	}
-
-	database::MeasurementRepository repository(databaseConnection);
+	database::MeasurementRepository repository(*databaseConnection);
 	application::MeasurementQueryService queryService(repository);
 	api::HttpRouter httpRouter;
 	api::ApiRoutes::registerRoutes(httpRouter, queryService);
@@ -223,9 +332,6 @@ int main()
 		if (httpThread.joinable()) httpThread.join();
 		if (webSocketThread.joinable()) webSocketThread.join();
 	};
-
-	std::signal(SIGINT, handleSignal);
-	std::signal(SIGTERM, handleSignal);
 
 	logMessage(LogLevel::Info, "Starting inverter-monitor");
 	logMessage(LogLevel::Info, "MQTT broker: " + mqttHost + ':' + std::to_string(mqttPort));

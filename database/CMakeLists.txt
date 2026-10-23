@@ -5,6 +5,7 @@ add_library(database STATIC)
 
 set(sources
     DatabaseSchema.cpp
+    ErrorClassification.cpp
     MeasurementRepository.cpp
     MigrationRunner.cpp
     Migrations.cpp
@@ -14,6 +15,7 @@ set(sources
 
 set(headers
     DatabaseSchema.h
+    ErrorClassification.h
     MeasurementRepository.h
     Migration.h
     MigrationRunner.h

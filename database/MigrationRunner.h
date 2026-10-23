@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "ErrorClassification.h"
 #include "Migration.h"
 
 namespace database {
@@ -17,6 +18,11 @@ struct MigrationResult
     int appliedCount = 0;
     int currentVersion = 0;
     std::string error;
+    // When ok is false: transient only for a lost connection or a transient
+    // SQLSTATE; invalid migrations and schema history errors are permanent.
+    ErrorKind errorKind = ErrorKind::Permanent;
+    // Empty when the failure was not reported by the server.
+    std::string sqlState;
 };
 
 // Applies pending migrations in ascending version order. Each migration and its

@@ -12,6 +12,7 @@
 
 #include <application/TelemetryIngestionService.h>
 #include <database/MeasurementRepository.h>
+#include <database/MigrationRunner.h>
 #include <database/PostgresConnection.h>
 #include <database/PostgresResult.h>
 
@@ -152,4 +153,51 @@ TEST_F(PostgresDiagnosticsTest, IngestionReportsPersistenceFailureAndSkipsHandle
     EXPECT_FALSE(handlerCalled);
     EXPECT_EQ(error.stage, application::IngestionError::Stage::Persistence);
     EXPECT_FALSE(error.message.empty());
+}
+
+TEST_F(PostgresDiagnosticsTest, RefusedConnectionIsTransient)
+{
+    EXPECT_EQ(m_connection->failureKind(), database::ErrorKind::Transient);
+}
+
+TEST_F(PostgresDiagnosticsTest, MigrationOnLostConnectionIsTransientWithoutSqlState)
+{
+    database::MigrationRunner runner(*m_connection, {{1, "first", "SELECT 1"}});
+
+    const auto result = runner.run();
+
+    EXPECT_FALSE(result.ok);
+    EXPECT_EQ(result.errorKind, database::ErrorKind::Transient);
+    EXPECT_TRUE(result.sqlState.empty());
+    EXPECT_FALSE(result.error.empty());
+}
+
+TEST_F(PostgresDiagnosticsTest, InvalidMigrationListIsPermanent)
+{
+    database::MigrationRunner runner(*m_connection, {{2, "second", "SELECT 1"}, {1, "first", "SELECT 1"}});
+
+    const auto result = runner.run();
+
+    EXPECT_FALSE(result.ok);
+    EXPECT_EQ(result.errorKind, database::ErrorKind::Permanent);
+    EXPECT_NE(result.error.find("Invalid migration list"), std::string::npos) << result.error;
+}
+
+TEST(PostgresConnectionParametersTest, UnparsableConnectionStringIsPermanent)
+{
+    const database::PostgresConnection connection("host");
+
+    EXPECT_FALSE(connection.isOk());
+    EXPECT_EQ(connection.failureKind(), database::ErrorKind::Permanent);
+    EXPECT_FALSE(connection.errorMessage().empty());
+}
+
+TEST(PostgresConnectionParametersTest, InvalidConnectTimeoutIsPermanent)
+{
+    const database::PostgresConnection connection("host=127.0.0.1 connect_timeout=soon");
+
+    EXPECT_FALSE(connection.isOk());
+    EXPECT_EQ(connection.failureKind(), database::ErrorKind::Permanent);
+    EXPECT_NE(connection.errorMessage().find("connect_timeout"), std::string::npos)
+        << connection.errorMessage();
 }

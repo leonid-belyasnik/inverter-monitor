@@ -17,6 +17,8 @@ bool DatabaseSchema::initialize()
     const auto result = runner.run();
 
     m_errorMessage = result.error;
+    m_errorKind = result.errorKind;
+    m_sqlState = result.sqlState;
 
     return result.ok;
 }
@@ -24,6 +26,16 @@ bool DatabaseSchema::initialize()
 const std::string& DatabaseSchema::errorMessage() const
 {
     return m_errorMessage;
+}
+
+ErrorKind DatabaseSchema::errorKind() const
+{
+    return m_errorKind;
+}
+
+const std::string& DatabaseSchema::sqlState() const
+{
+    return m_sqlState;
 }
 
 } // namespace database
