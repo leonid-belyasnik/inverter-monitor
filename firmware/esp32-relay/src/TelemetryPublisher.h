@@ -31,7 +31,8 @@ struct Reading {
 
 enum class PublishResult {
     Published,
-    NotConnected,
+    WifiNotConnected,
+    MqttNotConnected,
     IncompleteReading, // battery SOC or battery power not read this cycle
     NoTimestamp,
     PublishFailed,
@@ -58,6 +59,9 @@ public:
     void loop();
 
     bool isConnected();
+
+    // PubSubClient state code (0 = connected, negative = disconnected/error).
+    int mqttState();
 
     PublishResult publish(const Reading& reading);
 

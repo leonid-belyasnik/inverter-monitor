@@ -126,10 +126,17 @@ Possible publish results:
 | `published` | Payload sent; the line `Published seq=...` shows it |
 | `incomplete_reading` | Battery SOC or battery power failed to read in this cycle |
 | `no_timestamp` | Clock not yet synchronized via NTP |
-| `not_connected` | Wi-Fi or MQTT is down |
+| `wifi_not_connected` | Wi-Fi is down |
+| `mqtt_not_connected` | Wi-Fi is up, MQTT session is down |
 | `publish_failed` | Serialization or MQTT publish failed |
 
+Checks run in table order, so `no_timestamp` can hide a Wi-Fi outage. Each "not published" line therefore also shows `wifi_status` (`WiFi.status()`: 3 = connected, 1 = no SSID, 4 = connect failed, 5 = connection lost, 6 = disconnected), `mqtt_state` (PubSubClient `state()`), and `time_synced`.
+
 "Not published" messages are rate-limited to one per 10 s, except `publish_failed`, which is always logged.
+
+Wi-Fi events are logged from `loop()` as `Wi-Fi event: STA_CONNECTED | STA_GOT_IP | STA_LOST_IP | STA_DISCONNECTED, reason=<code> (<name>)`, followed by `status=<WiFi.status()>`. IP and RSSI are shown only after `STA_GOT_IP`. Arduino-ESP32 2.x has no separate reconnect-started event; the firmware's own retry prints `Wi-Fi not connected, retrying`, and its `WiFi.disconnect()` produces `reason=8 (ASSOC_LEAVE)`. The first NTP sync is logged once as `Time synchronized (NTP): <timestamp>`.
+
+After a disconnect with `reason=201 (NO_AP_FOUND)`, `2 (AUTH_EXPIRE)` or `202 (AUTH_FAIL)`, the firmware runs one asynchronous Wi-Fi scan (not while connected, at most once per 60 s) and prints each network's SSID, channel, RSSI and auth type, followed by `Configured SSID: FOUND` or `NOT FOUND`. The scan does not block `loop()`, changes no Wi-Fi settings and does not select a channel. The configured password is never printed; neighbouring SSIDs are.
 
 ### Diagnostic Mode
 

@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>
 #include <WiFiClient.h>
 
 #include "Config.h"
@@ -19,6 +20,7 @@ uint32_t lastTelemetryMs = 0;
 uint32_t lastDiagnosticMs = 0;
 uint32_t lastSkipLogMs = 0;
 bool firstCycle = true;
+bool timeSyncReported = false;
 
 // Reads one register and pauses for the inter-frame gap. Failures are logged
 // and reported through the result status; no previous value is reused.
@@ -118,8 +120,22 @@ void runTelemetryCycle()
         firstCycle ||
         now - lastSkipLogMs >= config::SKIP_LOG_INTERVAL_MS) {
         lastSkipLogMs = now;
-        Serial.printf("Telemetry not published: %s\n", telemetry::toString(result));
+        Serial.printf("Telemetry not published: %s (wifi_status=%d, mqtt_state=%d, time_synced=%s)\n",
+                      telemetry::toString(result),
+                      static_cast<int>(WiFi.status()),
+                      publisher.mqttState(),
+                      timesync::isSynced() ? "yes" : "no");
     }
+}
+
+void reportFirstTimeSync()
+{
+    if (timeSyncReported || !timesync::isSynced()) {
+        return;
+    }
+
+    timeSyncReported = true;
+    Serial.printf("Time synchronized (NTP): %s\n", timesync::nowIso8601Utc().c_str());
 }
 
 void runDiagnosticScan()
@@ -183,6 +199,7 @@ void setup()
 void loop()
 {
 	publisher.loop();
+	reportFirstTimeSync();
 
 	const uint32_t now = millis();
 
