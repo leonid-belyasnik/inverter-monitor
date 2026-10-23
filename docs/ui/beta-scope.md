@@ -6,7 +6,7 @@ The first beta is a responsive, read-only web interface for viewing inverter tel
 
 ## Beta Features
 
-* A home screen with the available measurements: battery state of charge, PV power, and home load power. Grid voltage is shown from the optional `grid_voltage` field and as unavailable when it is `null`; the simulator and the current ESP32 firmware do not publish it yet, and the field's presence in the API does not confirm Deye register 150 as a reliable source. Other available power values may be shown with their sign preserved; see [Telemetry and Freshness](telemetry-and-freshness.md).
+* A home screen with the available measurements: battery state of charge, PV power, and home load power. Grid voltage is shown from the optional `grid_voltage` field and as «Нет данных» when it is `null`. The grid relay state is shown separately from the optional `grid_relay_on` field and as unknown when it is `null`; it is labeled as the relay state, not as grid presence. The ESP32 firmware publishes both; the simulator publishes neither. Other available power values may be shown with their sign preserved; see [Telemetry and Freshness](telemetry-and-freshness.md).
 * Measurement history with charts built from the existing device measurement endpoint.
 * Separate indicators for HTTP/API availability, WebSocket connection state, and whether new telemetry is arriving.
 * The measurement time (`measured_at`) and browser-local receipt time as separate marks. Browser receipt time is not backend receive time. Showing `backend_received_at` is not required for the first UI beta; it remains a possible future backend/API extension.
@@ -29,7 +29,8 @@ The beta is ready for review when:
 
 * The responsive interface can be opened on a computer and an iPhone connected to the same home Wi-Fi network.
 * The home screen shows available measurements with explicit units, sign behavior, `measured_at`, browser receipt time, and data source; browser receipt time is not labeled as backend receipt time.
-* The grid-voltage card shows `grid_voltage` with one decimal place and the unit «В», and shows **«Недоступно»** when the value is `null`.
+* The grid-voltage card shows `grid_voltage` with one decimal place and the unit «В», and shows **«Нет данных»** when the value is `null`.
+* The «Состояние реле сети» card shows **«Включено»** / **«Отключено»** for `grid_relay_on` and **«Неизвестно»** when it is `null`.
 * The history view renders returned measurements in chronological order and communicates when the API limit truncates the requested history.
 * API errors, WebSocket connection loss, waiting for the first update, and stale telemetry have distinct visible states.
 * A forced WebSocket interruption is followed by reconnection and a fresh device subscription.

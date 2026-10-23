@@ -19,6 +19,15 @@ boost::json::value optionalValue(const std::optional<double>& value)
     return *value;
 }
 
+boost::json::value optionalValue(const std::optional<bool>& value)
+{
+    if (!value) {
+        return nullptr;
+    }
+
+    return *value;
+}
+
 } // namespace
 
 std::string formatTimestamp(
@@ -57,6 +66,7 @@ boost::json::object formatMeasurement(const domain::Measurement& measurement)
     object["load_power"] = optionalValue(measurement.loadPower);
     object["battery_soc"] = measurement.batterySoc;
     object["grid_voltage"] = optionalValue(measurement.gridVoltage);
+    object["grid_relay_on"] = optionalValue(measurement.gridRelayOn);
 
     return object;
 }

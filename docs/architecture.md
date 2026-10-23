@@ -44,7 +44,7 @@ The domain layer contains core application concepts independent of infrastructur
 Main types include:
 
 * `domain::DeviceId` — identifies an inverter or other telemetry source.
-* `domain::Measurement` — represents measurement values. `pvPower`, `gridPower`, `loadPower`, and `gridVoltage` are `std::optional<double>`; an empty value means the source did not provide it and is stored as SQL `NULL`, never as zero.
+* `domain::Measurement` — represents measurement values. `pvPower`, `gridPower`, `loadPower`, and `gridVoltage` are `std::optional<double>`; `gridRelayOn` is `std::optional<bool>`. An empty value means the source did not provide it and is stored as SQL `NULL`, never as zero or `false`.
 
 Device identification is modeled separately from measurement values.
 
@@ -57,10 +57,10 @@ The protocol layer handles the conversion of incoming telemetry payloads into ap
 Telemetry input (`schema_version` 1):
 
 * `measured_at` (ISO 8601 UTC with 1–3 fractional digits and `Z`), `measurement.battery_power_w`, and `measurement.battery_soc_pct` are required numbers.
-* `measurement.pv_power_w`, `measurement.grid_power_w`, `measurement.load_power_w`, and `measurement.grid_voltage_v` (volts) are optional. They may be absent or `null`; either is treated as unavailable. A value of `0` is a number, not unavailable.
-* Any present field with a non-numeric value, or any missing required field, rejects the whole message.
+* `measurement.pv_power_w`, `measurement.grid_power_w`, `measurement.load_power_w`, and `measurement.grid_voltage_v` (volts) are optional numbers. `measurement.grid_relay_on` is an optional boolean: the inverter's grid relay state. They may be absent or `null`; either is treated as unavailable. A value of `0` or `false` is a value, not unavailable.
+* Any present numeric field with a non-numeric value, a present `grid_relay_on` that is not a JSON boolean, or any missing required field rejects the whole message.
 
-The simulator always sends the five power and state-of-charge fields and does not send `grid_voltage_v`. The ESP32 firmware omits a field when its register is disabled or its read fails in that cycle; it does not yet publish `grid_voltage_v`. In the domain, PostgreSQL (`grid_voltage` column), REST, and WebSocket the voltage is named `grid_voltage`.
+The simulator always sends the five power and state-of-charge fields and does not send `grid_voltage_v` or `grid_relay_on`. The ESP32 firmware publishes `grid_voltage_v` (Deye register 150) and `grid_relay_on` (register 194, bit 0) and omits a field when its register is disabled or its read fails in that cycle. Messages without these fields remain valid. In the domain, PostgreSQL (`grid_voltage`, `grid_relay_on` columns), REST, and WebSocket the fields are named `grid_voltage` and `grid_relay_on`. `grid_relay_on = false` is not by itself proof that the external grid has no voltage.
 
 Protocol-specific parsing logic remains outside the domain layer.
 

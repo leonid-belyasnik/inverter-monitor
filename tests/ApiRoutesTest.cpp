@@ -54,7 +54,8 @@ TEST(ApiRoutesTest, ReturnsMeasurementsByDevice)
         .batteryPower = 400.0,
         .loadPower = 2200.0,
         .batterySoc = 71.0,
-        .gridVoltage = 231.0
+        .gridVoltage = 231.0,
+        .gridRelayOn = true
     };
 
     ASSERT_NE(repository.save(deviceId, measurement1), 0);
@@ -115,6 +116,8 @@ TEST(ApiRoutesTest, ReturnsMeasurementsByDevice)
     EXPECT_DOUBLE_EQ(
         measurement.at("grid_voltage").as_double(),
         231.0);
+
+    EXPECT_TRUE(measurement.at("grid_relay_on").as_bool());
 
     const auto rollbackResult = connection.execute("ROLLBACK");
 
@@ -188,6 +191,7 @@ TEST(ApiRoutesTest, ReturnsNullForMissingOptionalFields)
     EXPECT_TRUE(item.at("grid_power").is_null());
     EXPECT_TRUE(item.at("load_power").is_null());
     EXPECT_TRUE(item.at("grid_voltage").is_null());
+    EXPECT_TRUE(item.at("grid_relay_on").is_null());
     EXPECT_DOUBLE_EQ(item.at("battery_power").as_double(), -203.0);
     EXPECT_DOUBLE_EQ(item.at("battery_soc").as_double(), 98.0);
 
@@ -208,13 +212,15 @@ TEST(ApiRoutesTest, FormatsMeasurementWithAndWithoutOptionalFields)
         .batteryPower = 300.0,
         .loadPower = 1200.0,
         .batterySoc = 70.0,
-        .gridVoltage = 230.4
+        .gridVoltage = 230.4,
+        .gridRelayOn = true
     };
 
     const auto completeJson = api::formatMeasurement(complete);
 
-    EXPECT_EQ(completeJson.size(), 7);
+    EXPECT_EQ(completeJson.size(), 8);
     EXPECT_DOUBLE_EQ(completeJson.at("grid_voltage").as_double(), 230.4);
+    EXPECT_TRUE(completeJson.at("grid_relay_on").as_bool());
     EXPECT_EQ(completeJson.at("measured_at").as_string(), "2026-05-25T10:50:00.316Z");
     EXPECT_DOUBLE_EQ(completeJson.at("pv_power").as_double(), 1000.0);
     EXPECT_DOUBLE_EQ(completeJson.at("grid_power").as_double(), -100.0);
@@ -234,11 +240,12 @@ TEST(ApiRoutesTest, FormatsMeasurementWithAndWithoutOptionalFields)
 
     const auto partialJson = api::formatMeasurement(partial);
 
-    EXPECT_EQ(partialJson.size(), 7);
+    EXPECT_EQ(partialJson.size(), 8);
     EXPECT_TRUE(partialJson.at("pv_power").is_null());
     EXPECT_TRUE(partialJson.at("grid_power").is_null());
     EXPECT_TRUE(partialJson.at("load_power").is_null());
     EXPECT_TRUE(partialJson.at("grid_voltage").is_null());
+    EXPECT_TRUE(partialJson.at("grid_relay_on").is_null());
     EXPECT_DOUBLE_EQ(partialJson.at("battery_power").as_double(), -203.0);
     EXPECT_DOUBLE_EQ(partialJson.at("battery_soc").as_double(), 98.0);
 
@@ -250,11 +257,16 @@ TEST(ApiRoutesTest, FormatsMeasurementWithAndWithoutOptionalFields)
         .batteryPower = -203.0,
         .loadPower = std::nullopt,
         .batterySoc = 98.0,
-        .gridVoltage = 0.0
+        .gridVoltage = 0.0,
+        .gridRelayOn = false
     };
 
     const auto zeroJson = api::formatMeasurement(zeroVoltage);
 
     ASSERT_TRUE(zeroJson.at("grid_voltage").is_double());
     EXPECT_DOUBLE_EQ(zeroJson.at("grid_voltage").as_double(), 0.0);
+
+    // A relay reported as off is a real value and must not be serialized as null.
+    ASSERT_TRUE(zeroJson.at("grid_relay_on").is_bool());
+    EXPECT_FALSE(zeroJson.at("grid_relay_on").as_bool());
 }

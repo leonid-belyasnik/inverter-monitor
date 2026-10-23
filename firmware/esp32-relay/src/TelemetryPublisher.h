@@ -25,6 +25,12 @@ struct Reading {
     bool loadPowerOk = false;
     double loadPowerW = 0.0;
 
+    bool gridVoltageOk = false;
+    double gridVoltageV = 0.0;
+
+    bool gridRelayOk = false;
+    bool gridRelayOn = false;
+
     // Empty unless the clock is NTP-synced (see timesync::nowIso8601Utc()).
     String measuredAt;
 };
@@ -42,10 +48,10 @@ const char* toString(PublishResult result);
 
 // Publishes telemetry to v1/devices/<device_id>/telemetry using the same
 // JSON schema as simulator/main.cpp (schema_version 1). battery_soc_pct and
-// battery_power_w are required; pv_power_w, grid_power_w, and load_power_w
-// are omitted when unavailable. Manages Wi-Fi and MQTT reconnection
-// with bounded retry intervals; never blocks for longer than one connect
-// attempt.
+// battery_power_w are required; pv_power_w, grid_power_w, load_power_w,
+// grid_voltage_v, and grid_relay_on are omitted when unavailable. Manages
+// Wi-Fi and MQTT reconnection with bounded retry intervals; never blocks for
+// longer than one connect attempt.
 class TelemetryPublisher
 {
 public:

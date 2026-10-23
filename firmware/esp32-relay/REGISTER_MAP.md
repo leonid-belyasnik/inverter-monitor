@@ -12,10 +12,10 @@ Checked against the physical inverter display (see README, "Verified Hardware Te
 
 | Register | Meaning | Type / scale | Firmware use |
 |---|---|---|---|
-| `150` | Grid voltage | U16, × 0.1 V | Serial log only |
+| `150` | Grid voltage | U16, × 0.1 V | `grid_voltage_v` |
 | `184` | Battery SOC | U16, % | `battery_soc_pct` |
 | `190` | Battery power | S16, W; `+` discharge, `−` charge | `battery_power_w` |
-| `194` | Grid relay status | Bit 0: `1` = ON, `0` = OFF | Serial log only |
+| `194` | Grid relay status | Bit 0: `1` = ON, `0` = OFF | `grid_relay_on` (relay state, not grid presence) |
 
 Battery power sign and SOC scaling were checked under charging conditions. `battery_power_w` is published with the `+` discharge / `−` charge convention, but the discharge sign still requires hardware verification with the battery discharging.
 

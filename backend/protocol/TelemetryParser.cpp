@@ -71,6 +71,21 @@ std::optional<double> optionalNumber(
     return value->to_number<double>();
 }
 
+// Absent and null fields yield an empty optional. Any other non-boolean
+// value throws, so the whole payload is rejected.
+std::optional<bool> optionalBool(
+    const boost::json::object& object,
+    const std::string_view key)
+{
+    const auto* value = object.if_contains(key);
+
+    if (value == nullptr || value->is_null()) {
+        return std::nullopt;
+    }
+
+    return value->as_bool();
+}
+
 } // namespace
 
 namespace protocol {
@@ -109,6 +124,9 @@ std::optional<domain::Measurement> TelemetryParser::parse(
 
         result.gridVoltage =
             optionalNumber(measurement, "grid_voltage_v");
+
+        result.gridRelayOn =
+            optionalBool(measurement, "grid_relay_on");
 
         const auto measuredAt =
             parseTimestamp(object.at("measured_at").as_string());

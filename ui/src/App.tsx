@@ -1,5 +1,5 @@
 import './App.css'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { deviceConfig, sourceLabel } from './deviceConfig'
 import { PowerHistoryChart, SocHistoryChart } from './HistoryCharts'
 
@@ -39,6 +39,7 @@ type Measurement = {
   load_power: number | null
   battery_soc: number | null
   grid_voltage: number | null
+  grid_relay_on: boolean | null
 }
 
 type SocketState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error'
@@ -88,6 +89,7 @@ const metrics: {
   key: MetricKey | null
   unit: string
   fractionDigits?: number
+  emptyText?: string
 }[] = [
   {
     title: 'Напряжение сети',
@@ -97,6 +99,7 @@ const metrics: {
     key: 'grid_voltage',
     unit: 'В',
     fractionDigits: 1,
+    emptyText: 'Нет данных',
   },
   {
     title: 'Мощность сети',
@@ -169,6 +172,15 @@ function parseMeasurements(payload: unknown): Measurement[] {
       return field
     }
 
+    const readBoolean = (key: 'grid_relay_on'): boolean | null => {
+      const field = record[key]
+      if (field === undefined || field === null) return null
+      if (typeof field !== 'boolean') {
+        throw new Error(`Поле ${key} в измерении №${index + 1} имеет неверный формат.`)
+      }
+      return field
+    }
+
     return {
       measured_at: record.measured_at,
       battery_soc: readValue('battery_soc'),
@@ -177,8 +189,15 @@ function parseMeasurements(payload: unknown): Measurement[] {
       battery_power: readValue('battery_power'),
       load_power: readValue('load_power'),
       grid_voltage: readValue('grid_voltage'),
+      grid_relay_on: readBoolean('grid_relay_on'),
     }
   })
+}
+
+// Relay state only; OFF does not prove that the external grid has no voltage.
+function formatGridRelay(value: boolean | null): string {
+  if (value === null) return 'Неизвестно'
+  return value ? 'Включено' : 'Отключено'
 }
 
 // Live points replace REST points with the same parsed measured_at; the API has no stable record ID.
@@ -409,26 +428,44 @@ function App() {
 
           <div className="metrics-grid" aria-label="Показатели энергосистемы">
             {metrics.map((metric) => (
-              <article className="metric-card" key={metric.title}>
-                <div className="metric-card-top">
-                  <span className={`metric-icon ${metric.tone}`}><Icon name={metric.icon} /></span>
-                  <span className="unavailable-tag">
-                    {metric.key === null ? 'Недоступно' : apiState.status === 'loading' ? 'Загрузка' : latestMeasurement?.[metric.key] !== null && latestMeasurement?.[metric.key] !== undefined ? 'Данные API' : 'Недоступно'}
-                  </span>
-                </div>
-                <h2>{metric.title}</h2>
-                <p className="metric-value">
-                  {metric.key === null
-                    ? 'Недоступно'
-                    : apiState.status === 'loading'
-                    ? 'Загрузка…'
-                    : latestMeasurement?.[metric.key] !== null && latestMeasurement?.[metric.key] !== undefined
-                      ? `${formatMetricNumber(latestMeasurement[metric.key], metric.fractionDigits)} ${metric.unit}`
-                      : 'Недоступно'}
-                </p>
-                <p className="metric-description">{metric.description}</p>
-                {metric.key && latestMeasurement && <p className="metric-time">Измерено: {latestTime}</p>}
-              </article>
+              <Fragment key={metric.title}>
+                <article className="metric-card">
+                  <div className="metric-card-top">
+                    <span className={`metric-icon ${metric.tone}`}><Icon name={metric.icon} /></span>
+                    <span className="unavailable-tag">
+                      {metric.key === null ? 'Недоступно' : apiState.status === 'loading' ? 'Загрузка' : latestMeasurement?.[metric.key] !== null && latestMeasurement?.[metric.key] !== undefined ? 'Данные API' : metric.emptyText ?? 'Недоступно'}
+                    </span>
+                  </div>
+                  <h2>{metric.title}</h2>
+                  <p className="metric-value">
+                    {metric.key === null
+                      ? 'Недоступно'
+                      : apiState.status === 'loading'
+                      ? 'Загрузка…'
+                      : latestMeasurement?.[metric.key] !== null && latestMeasurement?.[metric.key] !== undefined
+                        ? `${formatMetricNumber(latestMeasurement[metric.key], metric.fractionDigits)} ${metric.unit}`
+                        : metric.emptyText ?? 'Недоступно'}
+                  </p>
+                  <p className="metric-description">{metric.description}</p>
+                  {metric.key && latestMeasurement && <p className="metric-time">Измерено: {latestTime}</p>}
+                </article>
+                {metric.key === 'grid_voltage' && (
+                  <article className="metric-card">
+                    <div className="metric-card-top">
+                      <span className="metric-icon violet"><Icon name="grid" /></span>
+                      <span className="unavailable-tag">
+                        {apiState.status === 'loading' ? 'Загрузка' : latestMeasurement?.grid_relay_on != null ? 'Данные API' : 'Нет данных'}
+                      </span>
+                    </div>
+                    <h2>Состояние реле сети</h2>
+                    <p className="metric-value">
+                      {apiState.status === 'loading' ? 'Загрузка…' : formatGridRelay(latestMeasurement?.grid_relay_on ?? null)}
+                    </p>
+                    <p className="metric-description">Реле инвертора; не подтверждает наличие или отсутствие напряжения во внешней сети</p>
+                    {latestMeasurement && <p className="metric-time">Измерено: {latestTime}</p>}
+                  </article>
+                )}
+              </Fragment>
             ))}
           </div>
 

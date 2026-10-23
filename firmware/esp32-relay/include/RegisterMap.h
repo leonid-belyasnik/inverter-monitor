@@ -20,10 +20,10 @@
 namespace registers {
 
 // ---- Verified registers ----
-constexpr uint16_t GRID_VOLTAGE = 150;      // U16, raw x 0.1 V. Diagnostic only (not an MQTT field).
+constexpr uint16_t GRID_VOLTAGE = 150;      // U16, raw x 0.1 V. -> measurement.grid_voltage_v
 constexpr uint16_t BATTERY_SOC = 184;       // U16, raw %. -> measurement.battery_soc_pct
 constexpr uint16_t BATTERY_POWER = 190;     // S16, W. +discharge / -charge (discharge sign not yet observed). -> measurement.battery_power_w
-constexpr uint16_t GRID_RELAY_STATUS = 194; // U16, bit0: 1=ON/0=OFF. Diagnostic only (not an MQTT field).
+constexpr uint16_t GRID_RELAY_STATUS = 194; // U16, bit0: 1=ON/0=OFF. -> measurement.grid_relay_on
 
 // ---- Candidate registers (UNVERIFIED) ----
 // One row per address under investigation for pv_power_w / grid_power_w /

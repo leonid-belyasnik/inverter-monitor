@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <optional>
 
 #include <database/PostgresConnection.h>
@@ -60,6 +61,15 @@ std::optional<std::string> formatOptionalDouble(const std::optional<double>& val
     return formatDouble(*value);
 }
 
+std::optional<std::string> formatOptionalBool(const std::optional<bool>& value)
+{
+    if (!value) {
+        return std::nullopt;
+    }
+
+    return *value ? "true" : "false";
+}
+
 // A null pointer is passed to libpq as SQL NULL.
 const char* parameterValue(const std::optional<std::string>& value)
 {
@@ -76,6 +86,19 @@ std::optional<double> optionalDouble(
     }
 
     return std::stod(result.value(row, column));
+}
+
+// PostgreSQL returns boolean values as "t" or "f" in text format.
+std::optional<bool> optionalBool(
+    const PostgresResult& result,
+    const int row,
+    const int column)
+{
+    if (result.isNull(row, column)) {
+        return std::nullopt;
+    }
+
+    return std::string_view(result.value(row, column)) == "t";
 }
 
 std::optional<std::chrono::system_clock::time_point>
@@ -148,6 +171,7 @@ std::int64_t MeasurementRepository::save(
     const auto loadPower = formatOptionalDouble(measurement.loadPower);
     const std::string batterySoc = formatDouble(measurement.batterySoc);
     const auto gridVoltage = formatOptionalDouble(measurement.gridVoltage);
+    const auto gridRelayOn = formatOptionalBool(measurement.gridRelayOn);
 
     const char* values[] = {
         deviceId.value.c_str(),
@@ -157,15 +181,17 @@ std::int64_t MeasurementRepository::save(
         batteryPower.c_str(),
         parameterValue(loadPower),
         batterySoc.c_str(),
-        parameterValue(gridVoltage)
+        parameterValue(gridVoltage),
+        parameterValue(gridRelayOn)
     };
 
     const auto result = m_connection.executeParams(
         "INSERT INTO measurements "
-        "(device_id, measured_at, pv_power, grid_power, battery_power, load_power, battery_soc, grid_voltage) "
-        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
+        "(device_id, measured_at, pv_power, grid_power, battery_power, load_power, battery_soc, "
+        "grid_voltage, grid_relay_on) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "
         "RETURNING id",
-        8,
+        9,
         values
     );
 
@@ -205,7 +231,7 @@ std::vector<MeasurementRecord> MeasurementRepository::findByDevice(
 
     const auto result = m_connection.executeParams(
         "SELECT device_id, measured_at, pv_power, grid_power, "
-        "battery_power, load_power, battery_soc, grid_voltage "
+        "battery_power, load_power, battery_soc, grid_voltage, grid_relay_on "
         "FROM measurements "
         "WHERE device_id = $1 "
         "ORDER BY measured_at DESC "
@@ -245,6 +271,8 @@ std::vector<MeasurementRecord> MeasurementRepository::findByDevice(
             std::stod(result.value(row, 6));
         record.measurement.gridVoltage =
             optionalDouble(result, row, 7);
+        record.measurement.gridRelayOn =
+            optionalBool(result, row, 8);
 
         records.push_back(std::move(record));
     }

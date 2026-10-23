@@ -164,9 +164,10 @@ const std::vector<std::string> expectedMeasurementColumns{
     "battery_soc double precision YES -",
     "device_id text NO -",
     "grid_voltage double precision YES -",
+    "grid_relay_on boolean YES -",
 };
 
-const std::vector<std::string> allVersions{"1", "2", "3"};
+const std::vector<std::string> allVersions{"1", "2", "3", "4"};
 
 // measurements as created before device_id was introduced (commit 7bf6053).
 const char* const originalMeasurementsSql =
@@ -193,21 +194,48 @@ TEST_F(MigrationRunnerTest, CleanDatabaseAppliesAllMigrations)
     const auto result = runner.run();
 
     ASSERT_TRUE(result.ok) << result.error;
-    EXPECT_EQ(result.appliedCount, 3);
-    EXPECT_EQ(result.currentVersion, 3);
+    EXPECT_EQ(result.appliedCount, 4);
+    EXPECT_EQ(result.currentVersion, 4);
     EXPECT_EQ(appliedVersions(), allVersions);
     EXPECT_EQ(
         queryColumn("SELECT name FROM schema_migrations ORDER BY version"),
         (std::vector<std::string>{
-            "create_measurements", "add_measurements_device_id", "add_measurements_grid_voltage"}));
+            "create_measurements", "add_measurements_device_id", "add_measurements_grid_voltage",
+            "add_measurements_grid_relay_on"}));
     EXPECT_EQ(measurementColumns(), expectedMeasurementColumns);
 
     ASSERT_TRUE(execute(
-        "INSERT INTO measurements (device_id, measured_at, grid_voltage) "
-        "VALUES ('device-a', now(), 230.4), ('device-b', now(), NULL)"));
+        "INSERT INTO measurements (device_id, measured_at, grid_voltage, grid_relay_on) "
+        "VALUES ('device-a', now(), 230.4, true), ('device-b', now(), NULL, NULL)"));
     EXPECT_EQ(
         queryColumn("SELECT grid_voltage FROM measurements ORDER BY id"),
         (std::vector<std::string>{"230.4", "NULL"}));
+    EXPECT_EQ(
+        queryColumn("SELECT grid_relay_on FROM measurements ORDER BY id"),
+        (std::vector<std::string>{"t", "NULL"}));
+}
+
+TEST_F(MigrationRunnerTest, UpgradesSchemaWithoutGridRelayOn)
+{
+    const auto& migrations = database::allMigrations();
+
+    ASSERT_TRUE(
+        MigrationRunner(*m_connection, {migrations[0], migrations[1], migrations[2]}).run().ok);
+    ASSERT_TRUE(execute(
+        "INSERT INTO measurements (device_id, measured_at, battery_soc, grid_voltage) "
+        "VALUES ('deye-esp32-001', '2026-01-01T00:00:00Z', 55, 230.1)"));
+
+    const auto result = MigrationRunner(*m_connection, migrations).run();
+
+    ASSERT_TRUE(result.ok) << result.error;
+    EXPECT_EQ(result.appliedCount, 1);
+    EXPECT_EQ(result.currentVersion, 4);
+    EXPECT_EQ(appliedVersions(), allVersions);
+    EXPECT_EQ(measurementColumns(), expectedMeasurementColumns);
+    EXPECT_EQ(
+        queryColumn("SELECT device_id || ' ' || grid_voltage::text || ' ' || "
+                    "coalesce(grid_relay_on::text, 'NULL') FROM measurements"),
+        (std::vector<std::string>{"deye-esp32-001 230.1 NULL"}));
 }
 
 TEST_F(MigrationRunnerTest, UpgradesOriginalSchemaWithoutDeviceId)
@@ -222,7 +250,7 @@ TEST_F(MigrationRunnerTest, UpgradesOriginalSchemaWithoutDeviceId)
     const auto result = runner.run();
 
     ASSERT_TRUE(result.ok) << result.error;
-    EXPECT_EQ(result.appliedCount, 3);
+    EXPECT_EQ(result.appliedCount, 4);
     EXPECT_EQ(appliedVersions(), allVersions);
     EXPECT_EQ(measurementColumns(), expectedMeasurementColumns);
     EXPECT_EQ(
@@ -246,7 +274,7 @@ TEST_F(MigrationRunnerTest, UpgradesSchemaWithoutGridVoltage)
     const auto result = runner.run();
 
     ASSERT_TRUE(result.ok) << result.error;
-    EXPECT_EQ(result.appliedCount, 3);
+    EXPECT_EQ(result.appliedCount, 4);
     EXPECT_EQ(appliedVersions(), allVersions);
     EXPECT_EQ(measurementColumns(), expectedMeasurementColumns);
     EXPECT_EQ(
@@ -285,6 +313,7 @@ TEST_F(MigrationRunnerTest, PreservesExistingMeasurementValues)
     ASSERT_TRUE(result.ok) << result.error;
     EXPECT_EQ(queryColumn(snapshotSql), before);
     EXPECT_EQ(queryText("SELECT count(*) FROM measurements WHERE grid_voltage IS NULL"), "3");
+    EXPECT_EQ(queryText("SELECT count(*) FROM measurements WHERE grid_relay_on IS NULL"), "3");
 }
 
 TEST_F(MigrationRunnerTest, RepeatedRunDoesNotReapplyMigrations)
@@ -300,7 +329,7 @@ TEST_F(MigrationRunnerTest, RepeatedRunDoesNotReapplyMigrations)
 
     ASSERT_TRUE(result.ok) << result.error;
     EXPECT_EQ(result.appliedCount, 0);
-    EXPECT_EQ(result.currentVersion, 3);
+    EXPECT_EQ(result.currentVersion, 4);
     EXPECT_EQ(queryColumn(historySql), historyBefore);
     EXPECT_EQ(measurementColumns(), expectedMeasurementColumns);
 }
@@ -338,7 +367,7 @@ TEST_F(MigrationRunnerTest, FailedMigrationIsRolledBackAndStopsLaterMigrations)
 
     ASSERT_TRUE(retry.ok) << retry.error;
     EXPECT_EQ(retry.appliedCount, 2);
-    EXPECT_EQ(appliedVersions(), allVersions);
+    EXPECT_EQ(appliedVersions(), (std::vector<std::string>{"1", "2", "3"}));
     EXPECT_TRUE(tableExists("partial_table"));
     EXPECT_TRUE(tableExists("third_table"));
 }
@@ -352,7 +381,8 @@ TEST_F(MigrationRunnerTest, RejectsUnknownHigherVersion)
         database::allMigrations()[0],
         database::allMigrations()[1],
         database::allMigrations()[2],
-        {4, "create_not_expected", "CREATE TABLE not_expected (id integer)"},
+        database::allMigrations()[3],
+        {5, "create_not_expected", "CREATE TABLE not_expected (id integer)"},
     };
 
     const auto result = MigrationRunner(*m_connection, withNext).run();
@@ -361,7 +391,7 @@ TEST_F(MigrationRunnerTest, RejectsUnknownHigherVersion)
     EXPECT_NE(result.error.find("version 999 is not known"), std::string::npos) << result.error;
     EXPECT_FALSE(tableExists("not_expected"));
     EXPECT_EQ(
-        appliedVersions(), (std::vector<std::string>{"1", "2", "3", "999"}));
+        appliedVersions(), (std::vector<std::string>{"1", "2", "3", "4", "999"}));
 
     database::DatabaseSchema schema(*m_connection);
 
@@ -512,7 +542,7 @@ TEST_F(MigrationRunnerTest, ConcurrentRunnersApplyEachMigrationOnce)
     }
 
     EXPECT_EQ(appliedTotal, 3);
-    EXPECT_EQ(appliedVersions(), allVersions);
+    EXPECT_EQ(appliedVersions(), (std::vector<std::string>{"1", "2", "3"}));
     EXPECT_EQ(
         queryColumn("SELECT version FROM run_log ORDER BY version"),
         (std::vector<std::string>{"2", "3"}));

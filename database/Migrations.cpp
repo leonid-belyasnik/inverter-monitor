@@ -37,6 +37,14 @@ ALTER TABLE measurements
     ADD COLUMN IF NOT EXISTS grid_voltage double precision
 )sql"
         },
+        {
+            4,
+            "add_measurements_grid_relay_on",
+            R"sql(
+ALTER TABLE measurements
+    ADD COLUMN grid_relay_on boolean
+)sql"
+        },
     };
 
     return migrations;

@@ -343,6 +343,12 @@ PublishResult TelemetryPublisher::publish(const Reading& reading)
         measurement["load_power_w"] = reading.loadPowerW;
     }
     measurement["battery_soc_pct"] = reading.batterySocPct;
+    if (reading.gridVoltageOk) {
+        measurement["grid_voltage_v"] = reading.gridVoltageV;
+    }
+    if (reading.gridRelayOk) {
+        measurement["grid_relay_on"] = reading.gridRelayOn;
+    }
 
     char payload[PAYLOAD_BUFFER_SIZE];
     const size_t length = serializeJson(document, payload, sizeof(payload));

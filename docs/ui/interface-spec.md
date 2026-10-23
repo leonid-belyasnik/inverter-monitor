@@ -8,7 +8,8 @@ The beta has two primary views: **Overview** and **History**. The selected devic
 
 Show a compact status area followed by measurement cards:
 
-* **Grid voltage** — `grid_voltage`, read from REST and WebSocket measurements. Display it with one decimal place and the unit **«В»** (for example, «230,4 В»). When the value is `null`, display **«Недоступно»**; do not estimate it or show zero as a substitute. A reported `0` is a real value and is displayed as `0,0 В`. The backend and UI support the field, but the simulator and the current ESP32 firmware do not publish it yet, so the card shows **«Недоступно»** for them. The presence of the field in the API does not confirm that Deye register 150 is a reliable source of grid voltage; see [Telemetry and Freshness](telemetry-and-freshness.md).
+* **Grid voltage** — `grid_voltage`, read from REST and WebSocket measurements. Display it with one decimal place and the unit **«В»** (for example, «230,4 В»). When the value is `null`, display **«Нет данных»**; do not estimate it or show zero as a substitute. A reported `0` is a real value and is displayed as `0,0 В`. The ESP32 firmware publishes it from Deye register 150; the simulator does not, so the card shows **«Нет данных»** for simulator data. See [Telemetry and Freshness](telemetry-and-freshness.md).
+* **Grid relay state** («Состояние реле сети») — `grid_relay_on`, shown on its own card next to grid voltage: `true` → **«Включено»**, `false` → **«Отключено»**, `null` → **«Неизвестно»** (tag **«Нет данных»**). The card states that this is the inverter's relay and does not confirm the presence or absence of voltage in the external grid. Do not infer the relay state from voltage or voltage from the relay state.
 * **Battery charge** — `battery_soc`, displayed as a percentage as indicated by the input field `battery_soc_pct`.
 * **PV power** — `pv_power`, with watts indicated by the input field `pv_power_w`.
 * **Home consumption** — `load_power`, with watts indicated by the input field `load_power_w`.
@@ -27,7 +28,7 @@ The status area distinguishes:
 
 ### History
 
-Plot available values returned by `GET /api/v1/devices/{deviceId}/measurements?limit=N`. The response is newest-first; sort by `measured_at` ascending for a time-axis chart. Use separate axes or charts for state of charge and power. Preserve source values and signs. Grid voltage is not plotted; it appears only on its card.
+Plot available values returned by `GET /api/v1/devices/{deviceId}/measurements?limit=N`. The response is newest-first; sort by `measured_at` ascending for a time-axis chart. Use separate axes or charts for state of charge and power. Preserve source values and signs. Grid voltage and grid relay state are not plotted; they appear only on their cards.
 
 The endpoint supports at most 1000 measurements and has no time-range or pagination parameters. Indicate the selected sample limit and explain that the view contains only the returned recent records. Show an empty state when the response contains no measurements.
 

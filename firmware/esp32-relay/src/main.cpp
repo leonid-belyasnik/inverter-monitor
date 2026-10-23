@@ -61,12 +61,16 @@ telemetry::Reading pollRegisters()
 
     const auto voltage = readRegister(registers::GRID_VOLTAGE, "Grid voltage");
     if (voltage.status == modbus::ReadStatus::Ok) {
-        Serial.printf("Grid voltage: %.1f V\n", voltage.value * 0.1);
+        reading.gridVoltageOk = true;
+        reading.gridVoltageV = voltage.value / 10.0;
+        Serial.printf("Grid voltage: %.1f V\n", reading.gridVoltageV);
     }
 
     const auto relay = readRegister(registers::GRID_RELAY_STATUS, "Grid relay");
     if (relay.status == modbus::ReadStatus::Ok) {
-        Serial.printf("Grid relay: %s\n", (relay.value & 1) ? "ON" : "OFF");
+        reading.gridRelayOk = true;
+        reading.gridRelayOn = (relay.value & 1) != 0;
+        Serial.printf("Grid relay: %s\n", reading.gridRelayOn ? "ON" : "OFF");
     }
 
     const auto soc = readRegister(registers::BATTERY_SOC, "Battery SOC");

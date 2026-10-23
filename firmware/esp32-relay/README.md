@@ -114,7 +114,7 @@ Grid voltage: 217.5 V
 Grid relay: ON
 Battery SOC: 98%
 Battery power: -203 W (+discharge / -charge)
-Published seq=1: {"schema_version":1,"seq":1,"measured_at":"2026-10-22T09:15:00.120Z","measurement":{"battery_power_w":-203,"battery_soc_pct":98}}
+Published seq=1: {"schema_version":1,"seq":1,"measured_at":"2026-10-22T09:15:00.120Z","measurement":{"battery_power_w":-203,"battery_soc_pct":98,"grid_voltage_v":217.5,"grid_relay_on":true}}
 ```
 
 Actual values depend on the inverter's operating conditions.
@@ -183,7 +183,7 @@ PV (186 + 187), grid (169), and load (178) power registers are **unconfirmed** a
 
 Registers are read individually. Each response is checked for slave address, function code, byte count, length, and CRC. Modbus exception replies (function `0x83`) are reported with their exception code. A failed read is reported as failed for that cycle; the firmware never reuses a previous value.
 
-`Grid relay: ON` represents the inverter's grid-relay status. It does not independently guarantee that usable grid voltage is present.
+`Grid relay: ON` represents the inverter's grid-relay status. It does not independently guarantee that usable grid voltage is present, and `OFF` does not by itself prove that the external grid has no voltage (the inverter may keep the relay open, for example, while the voltage is out of range).
 
 ## MQTT Telemetry
 
@@ -205,7 +205,9 @@ Payload (`schema_version` 1, same schema as `simulator/main.cpp`, parsed by `bac
     "grid_power_w": -200,
     "battery_power_w": -450,
     "load_power_w": 1170,
-    "battery_soc_pct": 76
+    "battery_soc_pct": 76,
+    "grid_voltage_v": 230.4,
+    "grid_relay_on": true
   }
 }
 ```
@@ -214,6 +216,7 @@ If a gate is set back to `false`, or its read fails in a cycle, that field is om
 
 - `battery_soc_pct` and `battery_power_w` are required. If either fails to read, nothing is published for that cycle (`incomplete_reading`).
 - `pv_power_w`, `grid_power_w`, and `load_power_w` are optional. Each is included only when its register gate is enabled and the read succeeded in the current cycle; otherwise it is omitted. The backend stores omitted fields as `NULL` and returns them as `null`.
+- `grid_voltage_v` (register 150 × 0.1 V, number) and `grid_relay_on` (register 194 bit 0, JSON boolean) are optional. Each is included only when its register was read successfully in the current cycle; otherwise it is omitted, never sent as `0` or `false`. `grid_relay_on` is the relay state, not a grid-presence flag.
 - Missing values are never replaced by zero or an estimate, because the backend would store them as real measurements.
 - A message is published only when the clock is synchronized.
 - `seq` starts at 1 after each boot and increases by one per published message.
