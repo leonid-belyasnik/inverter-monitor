@@ -55,7 +55,7 @@ function parseWebSocketMessage(payload: unknown):
   | { type: 'measurement'; device_id: string; data: unknown }
   | { type: 'error'; message: string } {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-    throw new Error('WebSocket прислал сообщение в неожиданном формате.')
+    throw new Error('WebSocket sent a message in an unexpected format.')
   }
 
   const message = payload as Record<string, unknown>
@@ -68,7 +68,7 @@ function parseWebSocketMessage(payload: unknown):
   if (message.type === 'measurement' && typeof message.device_id === 'string') {
     return { type: 'measurement', device_id: message.device_id, data: message.data }
   }
-  throw new Error('WebSocket прислал неизвестное сообщение.')
+  throw new Error('WebSocket sent an unknown message.')
 }
 
 type ApiState =
@@ -92,82 +92,82 @@ const metrics: {
   emptyText?: string
 }[] = [
   {
-    title: 'Напряжение сети',
+    title: 'Grid voltage',
     icon: 'grid',
     tone: 'violet',
-    description: 'Значение как получено от устройства',
+    description: 'Value as received from the device',
     key: 'grid_voltage',
-    unit: 'В',
+    unit: 'V',
     fractionDigits: 1,
-    emptyText: 'Нет данных',
+    emptyText: 'No data',
   },
   {
-    title: 'Мощность сети',
+    title: 'Grid power',
     icon: 'grid',
     tone: 'violet',
-    description: 'Значение как получено; направление не определено',
+    description: 'Value as received; direction not determined',
     key: 'grid_power',
-    unit: 'Вт',
+    unit: 'W',
   },
   {
-    title: 'Заряд батареи',
+    title: 'Battery charge',
     icon: 'battery',
     tone: 'mint',
-    description: 'Состояние аккумулятора',
+    description: 'Battery state of charge',
     key: 'battery_soc',
     unit: '%',
   },
   {
-    title: 'Мощность батареи',
+    title: 'Battery power',
     icon: 'battery',
     tone: 'mint',
-    description: 'Значение как получено; направление не подтверждено',
+    description: 'Value as received; direction not confirmed',
     key: 'battery_power',
-    unit: 'Вт',
+    unit: 'W',
   },
   {
-    title: 'Мощность солнечных панелей',
+    title: 'Solar panel power',
     icon: 'solar',
     tone: 'amber',
-    description: 'Текущая генерация PV',
+    description: 'Current PV generation',
     key: 'pv_power',
-    unit: 'Вт',
+    unit: 'W',
   },
   {
-    title: 'Потребление дома',
+    title: 'Home consumption',
     icon: 'home',
     tone: 'blue',
-    description: 'Текущая нагрузка',
+    description: 'Current load',
     key: 'load_power',
-    unit: 'Вт',
+    unit: 'W',
   },
 ]
 
 function parseMeasurements(payload: unknown): Measurement[] {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-    throw new Error('Сервер вернул ответ в неожиданном формате.')
+    throw new Error('The server returned a response in an unexpected format.')
   }
 
   const response = payload as Record<string, unknown>
   if (response.device_id !== deviceConfig.deviceId || !Array.isArray(response.measurements)) {
-    throw new Error('Ответ сервера не соответствует выбранному устройству.')
+    throw new Error('The server response does not match the selected device.')
   }
 
   return response.measurements.map((value, index) => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      throw new Error(`Измерение №${index + 1} имеет неверный формат.`)
+      throw new Error(`Measurement #${index + 1} has an invalid format.`)
     }
 
     const record = value as Record<string, unknown>
     if (typeof record.measured_at !== 'string' || Number.isNaN(Date.parse(record.measured_at))) {
-      throw new Error(`У измерения №${index + 1} отсутствует корректное время.`)
+      throw new Error(`Measurement #${index + 1} has a missing or invalid timestamp.`)
     }
 
     const readValue = (key: MeasurementKey): number | null => {
       const field = record[key]
       if (field === undefined || field === null) return null
       if (typeof field !== 'number' || !Number.isFinite(field)) {
-        throw new Error(`Поле ${key} в измерении №${index + 1} имеет неверный формат.`)
+        throw new Error(`Field ${key} in measurement #${index + 1} has an invalid format.`)
       }
       return field
     }
@@ -176,7 +176,7 @@ function parseMeasurements(payload: unknown): Measurement[] {
       const field = record[key]
       if (field === undefined || field === null) return null
       if (typeof field !== 'boolean') {
-        throw new Error(`Поле ${key} в измерении №${index + 1} имеет неверный формат.`)
+        throw new Error(`Field ${key} in measurement #${index + 1} has an invalid format.`)
       }
       return field
     }
@@ -196,8 +196,8 @@ function parseMeasurements(payload: unknown): Measurement[] {
 
 // Relay state only; OFF does not prove that the external grid has no voltage.
 function formatGridRelay(value: boolean | null): string {
-  if (value === null) return 'Неизвестно'
-  return value ? 'Включено' : 'Отключено'
+  if (value === null) return 'Unknown'
+  return value ? 'On' : 'Off'
 }
 
 // Live points replace REST points with the same parsed measured_at; the API has no stable record ID.
@@ -213,16 +213,16 @@ function mergeHistory(restHistory: Measurement[], liveHistory: Measurement[]): M
 
 // Without fractionDigits the number is shown exactly as received. null is never shown as a number.
 function formatMetricNumber(value: number | null, fractionDigits?: number): string {
-  if (value === null) return 'Недоступно'
+  if (value === null) return 'Unavailable'
   if (fractionDigits === undefined) return String(value)
-  return value.toLocaleString('ru-RU', {
+  return value.toLocaleString('en-US', {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   })
 }
 
 function formatMeasurementTime(value: string): string {
-  return `${new Intl.DateTimeFormat('ru-RU', {
+  return `${new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
     dateStyle: 'medium',
     timeStyle: 'medium',
@@ -230,8 +230,8 @@ function formatMeasurementTime(value: string): string {
 }
 
 function formatBrowserTime(value: number | null): string {
-  if (value === null) return 'Ещё не получено'
-  return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'medium' }).format(value)
+  if (value === null) return 'Not received yet'
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'medium' }).format(value)
 }
 
 function App() {
@@ -251,19 +251,19 @@ function App() {
         `/api/v1/devices/${encodeURIComponent(deviceConfig.deviceId)}/measurements?limit=${HISTORY_LIMIT}`,
       )
       if (!response.ok) {
-        throw new Error(`Не удалось загрузить измерения (HTTP ${response.status}).`)
+        throw new Error(`Failed to load measurements (HTTP ${response.status}).`)
       }
 
       const measurements = parseMeasurements(await response.json())
       return { status: 'success', measurements }
     } catch (error) {
       const message = error instanceof SyntaxError
-        ? 'Сервер вернул некорректный JSON-ответ.'
+        ? 'The server returned an invalid JSON response.'
         : error instanceof TypeError
-          ? 'Не удалось связаться с API. Проверьте подключение и попробуйте ещё раз.'
+          ? 'Could not reach the API. Check your connection and try again.'
           : error instanceof Error
             ? error.message
-            : 'Не удалось загрузить измерения.'
+            : 'Failed to load measurements.'
       return {
         status: 'error',
         message,
@@ -300,7 +300,7 @@ function App() {
           const message = parseWebSocketMessage(JSON.parse(event.data) as unknown)
           if (message.type === 'subscribed') {
             if (message.device_id !== deviceConfig.deviceId) {
-              throw new Error('Подтверждение подписки относится к другому устройству.')
+              throw new Error('The subscription confirmation is for a different device.')
             }
             subscribed = true
             retry = 0
@@ -308,10 +308,10 @@ function App() {
             setSocketError(null)
             setSubscriptionStartedAt((startedAt) => startedAt ?? Date.now())
           } else if (message.type === 'error') {
-            throw new Error(`Ошибка подписки: ${message.message}`)
+            throw new Error(`Subscription error: ${message.message}`)
           } else {
             if (message.device_id !== deviceConfig.deviceId) return
-            if (!subscribed) throw new Error('Измерение получено до подтверждения подписки.')
+            if (!subscribed) throw new Error('A measurement was received before the subscription was confirmed.')
             const measurement = parseMeasurements({
               device_id: deviceConfig.deviceId,
               measurements: [message.data],
@@ -329,13 +329,13 @@ function App() {
           }
         } catch (error) {
           setSocketState('error')
-          setSocketError(error instanceof Error ? error.message : 'Ошибка данных WebSocket.')
+          setSocketError(error instanceof Error ? error.message : 'WebSocket data error.')
           currentSocket.close()
         }
       }
       currentSocket.onerror = () => {
         setSocketState('error')
-        setSocketError('Не удалось подключиться к WebSocket.')
+        setSocketError('Could not connect to WebSocket.')
       }
       currentSocket.onclose = () => {
         if (!active || intentionallyClosed) return
@@ -380,12 +380,12 @@ function App() {
     : now - lastReceiptAt >= STALE_AFTER_MS ? 'stale' : 'updating'
   const latestTime = latestMeasurement
     ? formatMeasurementTime(latestMeasurement.measured_at)
-    : 'Нет данных'
+    : 'No data'
 
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="#overview" aria-label="HomePowerGuard — главная">
+        <a className="brand" href="#overview" aria-label="HomePowerGuard — home">
           <span className="brand-mark" aria-hidden="true">
             <svg fill="none" viewBox="0 0 36 36">
               <path d="m5 16 13-10 13 10v14H5V16Z" />
@@ -395,14 +395,14 @@ function App() {
           <span className="brand-name">HomePowerGuard</span>
         </a>
 
-        <nav className="main-nav" aria-label="Основная навигация">
-          <a className="nav-link active" href="#overview">Обзор</a>
-          <a className="nav-link" href="#history">История</a>
+        <nav className="main-nav" aria-label="Main navigation">
+          <a className="nav-link active" href="#overview">Overview</a>
+          <a className="nav-link" href="#history">History</a>
         </nav>
 
         <div className={`connection-pill ${apiState.status === 'success' ? 'connected' : ''}`} role="status">
           <span className="connection-dot" />
-          <span>{apiState.status === 'loading' ? 'Загрузка' : apiState.status === 'error' ? 'Ошибка API' : 'API доступен'}</span>
+          <span>{apiState.status === 'loading' ? 'Loading' : apiState.status === 'error' ? 'API error' : 'API available'}</span>
         </div>
       </header>
 
@@ -410,59 +410,59 @@ function App() {
         <section className="overview-section" id="overview" aria-labelledby="page-title">
           <div className="page-heading">
             <div>
-              <p className="eyebrow">МОНИТОРИНГ ЭНЕРГОСИСТЕМЫ</p>
-              <h1 id="page-title">Энергия вашего дома</h1>
+              <p className="eyebrow">ENERGY SYSTEM MONITORING</p>
+              <h1 id="page-title">Your home energy</h1>
               <p className="page-description">
-                Основные показатели системы и состояние телеметрии в одном месте.
+                Key system metrics and telemetry status in one place.
               </p>
-              <p className="source-label">Источник: {sourceLabel} <span>·</span> Устройство: {deviceConfig.deviceId}</p>
+              <p className="source-label">Source: {sourceLabel} <span>·</span> Device: {deviceConfig.deviceId}</p>
             </div>
             <div className="data-state-card">
               <span className="state-icon"><Icon name="history" /></span>
               <span className="state-copy">
-                <span className="state-label">Состояние данных</span>
-                <strong>{telemetryState === 'stale' ? 'Нет недавней телеметрии' : telemetryState === 'waiting' ? 'Ожидаем телеметрию' : 'Телеметрия обновляется'}</strong>
+                <span className="state-label">Data status</span>
+                <strong>{telemetryState === 'stale' ? 'No recent telemetry' : telemetryState === 'waiting' ? 'Waiting for telemetry' : 'Telemetry is updating'}</strong>
               </span>
             </div>
           </div>
 
-          <div className="metrics-grid" aria-label="Показатели энергосистемы">
+          <div className="metrics-grid" aria-label="Energy system metrics">
             {metrics.map((metric) => (
               <Fragment key={metric.title}>
                 <article className="metric-card">
                   <div className="metric-card-top">
                     <span className={`metric-icon ${metric.tone}`}><Icon name={metric.icon} /></span>
                     <span className="unavailable-tag">
-                      {metric.key === null ? 'Недоступно' : apiState.status === 'loading' ? 'Загрузка' : latestMeasurement?.[metric.key] !== null && latestMeasurement?.[metric.key] !== undefined ? 'Данные API' : metric.emptyText ?? 'Недоступно'}
+                      {metric.key === null ? 'Unavailable' : apiState.status === 'loading' ? 'Loading' : latestMeasurement?.[metric.key] !== null && latestMeasurement?.[metric.key] !== undefined ? 'API data' : metric.emptyText ?? 'Unavailable'}
                     </span>
                   </div>
                   <h2>{metric.title}</h2>
                   <p className="metric-value">
                     {metric.key === null
-                      ? 'Недоступно'
+                      ? 'Unavailable'
                       : apiState.status === 'loading'
-                      ? 'Загрузка…'
+                      ? 'Loading…'
                       : latestMeasurement?.[metric.key] !== null && latestMeasurement?.[metric.key] !== undefined
                         ? `${formatMetricNumber(latestMeasurement[metric.key], metric.fractionDigits)} ${metric.unit}`
-                        : metric.emptyText ?? 'Недоступно'}
+                        : metric.emptyText ?? 'Unavailable'}
                   </p>
                   <p className="metric-description">{metric.description}</p>
-                  {metric.key && latestMeasurement && <p className="metric-time">Измерено: {latestTime}</p>}
+                  {metric.key && latestMeasurement && <p className="metric-time">Measured: {latestTime}</p>}
                 </article>
                 {metric.key === 'grid_voltage' && (
                   <article className="metric-card">
                     <div className="metric-card-top">
                       <span className="metric-icon violet"><Icon name="grid" /></span>
                       <span className="unavailable-tag">
-                        {apiState.status === 'loading' ? 'Загрузка' : latestMeasurement?.grid_relay_on != null ? 'Данные API' : 'Нет данных'}
+                        {apiState.status === 'loading' ? 'Loading' : latestMeasurement?.grid_relay_on != null ? 'API data' : 'No data'}
                       </span>
                     </div>
-                    <h2>Состояние реле сети</h2>
+                    <h2>Grid relay status</h2>
                     <p className="metric-value">
-                      {apiState.status === 'loading' ? 'Загрузка…' : formatGridRelay(latestMeasurement?.grid_relay_on ?? null)}
+                      {apiState.status === 'loading' ? 'Loading…' : formatGridRelay(latestMeasurement?.grid_relay_on ?? null)}
                     </p>
-                    <p className="metric-description">Реле инвертора; не подтверждает наличие или отсутствие напряжения во внешней сети</p>
-                    {latestMeasurement && <p className="metric-time">Измерено: {latestTime}</p>}
+                    <p className="metric-description">Inverter relay; does not confirm whether voltage is present on the external grid</p>
+                    {latestMeasurement && <p className="metric-time">Measured: {latestTime}</p>}
                   </article>
                 )}
               </Fragment>
@@ -473,58 +473,58 @@ function App() {
             <div className="timestamps-heading">
               <span className="timestamps-icon"><Icon name="clock" /></span>
               <div>
-                <h2 id="timestamps-title">Обновление данных</h2>
-                <p>Время измерения из API; получение браузером — отдельная отметка. Порог свежести 15 секунд предварительный.</p>
+                <h2 id="timestamps-title">Data updates</h2>
+                <p>Measurement time comes from the API; the time received by the browser is a separate timestamp. The 15-second freshness threshold is provisional.</p>
               </div>
             </div>
             <div className="timestamp-values">
               <div className="timestamp-item">
-                <span>Последнее измерение</span>
+                <span>Latest measurement</span>
                 <strong>{latestTime}</strong>
               </div>
               <div className="timestamp-item">
-                <span>Получено браузером</span>
+                <span>Received by browser</span>
                 <strong>{formatBrowserTime(lastReceiptAt)}</strong>
               </div>
               <div className="timestamp-item">
                 <span>WebSocket</span>
-                <strong>{socketState === 'connected' ? 'Подписка активна' : socketState === 'connecting' ? 'Подключение' : socketState === 'reconnecting' ? 'Повторное подключение' : socketState === 'disconnected' ? 'Отключён' : 'Ошибка соединения'}</strong>
+                <strong>{socketState === 'connected' ? 'Subscribed' : socketState === 'connecting' ? 'Connecting' : socketState === 'reconnecting' ? 'Reconnecting' : socketState === 'disconnected' ? 'Disconnected' : 'Connection error'}</strong>
               </div>
               <div className="timestamp-item">
-                <span>Актуальность</span>
-                <strong>{telemetryState === 'updating' ? `Обновлено ${Math.floor((now - (lastReceiptAt ?? now)) / 1000)} с назад` : telemetryState === 'stale' ? 'Нет обновлений более 15 секунд' : 'Ожидание первого сообщения'}</strong>
+                <span>Freshness</span>
+                <strong>{telemetryState === 'updating' ? `Updated ${Math.floor((now - (lastReceiptAt ?? now)) / 1000)} s ago` : telemetryState === 'stale' ? 'No updates for over 15 seconds' : 'Waiting for the first message'}</strong>
               </div>
             </div>
           </section>
 
-          {socketError && <p className="request-message" role="status">WebSocket: {socketError} Повторное подключение выполняется автоматически.</p>}
+          {socketError && <p className="request-message" role="status">WebSocket: {socketError} Reconnecting automatically.</p>}
 
-          {apiState.status === 'loading' && <p className="request-message" role="status">Загружаем измерения устройства…</p>}
+          {apiState.status === 'loading' && <p className="request-message" role="status">Loading device measurements…</p>}
           {apiState.status === 'error' && (
             <div className="request-error" role="alert">
               <p>{apiState.message}</p>
-              <button type="button" onClick={() => void loadMeasurements()}>Повторить запрос</button>
+              <button type="button" onClick={() => void loadMeasurements()}>Retry request</button>
             </div>
           )}
           {apiState.status === 'success' && chartHistory.length === 0 && (
-            <p className="request-message">История измерений пока пуста.</p>
+            <p className="request-message">The measurement history is empty.</p>
           )}
         </section>
 
         <section className="history-section" id="history" aria-labelledby="history-title">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">ДИНАМИКА</p>
-              <h2 id="history-title">История измерений</h2>
+              <p className="eyebrow">TRENDS</p>
+              <h2 id="history-title">Measurement history</h2>
             </div>
-            <span className="history-period">{apiState.status === 'success' ? `Записей: ${chartHistory.length}` : 'Последние измерения'}</span>
+            <span className="history-period">{apiState.status === 'success' ? `Records: ${chartHistory.length}` : 'Latest measurements'}</span>
           </div>
           {apiState.status === 'success' && chartHistory.length > 0 ? (
             <div className="history-charts">
               <p className="history-note">
-                Показано {chartHistory.length} последних записей (не более {HISTORY_LIMIT}) — более старые измерения в
-                выборку не входят. История загружается по REST при открытии страницы и дополняется новыми измерениями
-                по WebSocket без перезагрузки.
+                Showing the latest {chartHistory.length} records (at most {HISTORY_LIMIT}); older measurements are
+                not included. History is loaded over REST when the page opens and is extended with new measurements
+                over WebSocket without a reload.
               </p>
               <PowerHistoryChart measurements={chartHistory} />
               <SocHistoryChart measurements={chartHistory} />
@@ -532,10 +532,10 @@ function App() {
           ) : (
             <div className="history-empty">
               <span className="empty-icon"><Icon name="history" /></span>
-              <h3>{apiState.status === 'loading' ? 'Загружаем историю' : apiState.status === 'error' ? 'История недоступна' : 'История измерений'}</h3>
+              <h3>{apiState.status === 'loading' ? 'Loading history' : apiState.status === 'error' ? 'History unavailable' : 'Measurement history'}</h3>
               <p>{apiState.status === 'error'
-                ? 'Не удалось получить записи истории.'
-                : 'История появится здесь, когда будут доступны измерения.'}</p>
+                ? 'Could not retrieve history records.'
+                : 'History will appear here once measurements are available.'}</p>
             </div>
           )}
         </section>
@@ -543,7 +543,7 @@ function App() {
 
       <footer className="page-footer">
         <span>HomePowerGuard</span>
-        <span>Локальный мониторинг энергосистемы</span>
+        <span>Local energy system monitoring</span>
       </footer>
     </div>
   )

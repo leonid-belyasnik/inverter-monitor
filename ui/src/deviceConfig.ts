@@ -11,5 +11,5 @@ export const deviceConfig: {
 
 export const sourceLabel =
   deviceConfig.source === 'simulator'
-    ? 'Симулятор · тестовые данные'
+    ? 'Simulator · test data'
     : 'Deye inverter'

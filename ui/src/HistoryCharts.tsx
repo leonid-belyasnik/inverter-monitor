@@ -15,9 +15,9 @@ type PowerSeriesKey = 'pv_power' | 'grid_power' | 'battery_power' | 'load_power'
 
 const POWER_SERIES: { key: PowerSeriesKey; label: string; color: string }[] = [
   { key: 'pv_power', label: 'PV', color: '#a87832' },
-  { key: 'grid_power', label: 'Сеть', color: '#7564a7' },
-  { key: 'battery_power', label: 'Батарея', color: '#4a806c' },
-  { key: 'load_power', label: 'Нагрузка', color: '#587c9b' },
+  { key: 'grid_power', label: 'Grid', color: '#7564a7' },
+  { key: 'battery_power', label: 'Battery', color: '#4a806c' },
+  { key: 'load_power', label: 'Load', color: '#587c9b' },
 ]
 
 // Logical coordinate system for the chart geometry (grid, lines, markers).
@@ -155,7 +155,7 @@ function xAxisTicks(count: number, times: number[]): AxisTick[] {
 }
 
 function formatAxisTime(value: string): string {
-  return `${new Intl.DateTimeFormat('ru-RU', {
+  return `${new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
     day: '2-digit',
     month: '2-digit',
@@ -176,7 +176,7 @@ export function PowerHistoryChart({ measurements }: { measurements: HistoryMeasu
   const sorted = sortAscending(measurements)
 
   if (sorted.length === 0) {
-    return <ChartEmptyState message="Нет данных для графика мощности." />
+    return <ChartEmptyState message="No data for the power chart." />
   }
 
   const times = sorted.map((measurement) => Date.parse(measurement.measured_at))
@@ -192,9 +192,9 @@ export function PowerHistoryChart({ measurements }: { measurements: HistoryMeasu
 
   return (
     <div className="chart-block">
-      <h3 className="chart-title">Мощность, Вт</h3>
+      <h3 className="chart-title">Power, W</h3>
       <p className="chart-subtitle">
-        Знак значений соответствует исходным данным API; направление потока (импорт/экспорт) не определено.
+        Value signs match the raw API data; flow direction (import/export) is not determined.
       </p>
       <div className="chart-row">
         <div className="chart-y-axis" aria-hidden="true">
@@ -209,7 +209,7 @@ export function PowerHistoryChart({ measurements }: { measurements: HistoryMeasu
             viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
             className="history-chart"
             role="img"
-            aria-label="График мощности PV, сети, батареи и нагрузки по времени"
+            aria-label="Chart of PV, grid, battery and load power over time"
           >
             {ticks.map((tick) => (
               <line
@@ -262,7 +262,7 @@ export function PowerHistoryChart({ measurements }: { measurements: HistoryMeasu
                         r={MARKER_RADIUS}
                         fill={color}
                       >
-                        <title>{`${formatAxisTime(sorted[segment[0].i].measured_at)} UTC: ${formatNumber(values[segment[0].i] as number)} Вт`}</title>
+                        <title>{`${formatAxisTime(sorted[segment[0].i].measured_at)} UTC: ${formatNumber(values[segment[0].i] as number)} W`}</title>
                       </circle>
                     ),
                   )}
@@ -302,7 +302,7 @@ export function SocHistoryChart({ measurements }: { measurements: HistoryMeasure
   const sorted = sortAscending(measurements)
 
   if (sorted.length === 0) {
-    return <ChartEmptyState message="Нет данных для графика заряда батареи." />
+    return <ChartEmptyState message="No data for the battery charge chart." />
   }
 
   const times = sorted.map((measurement) => Date.parse(measurement.measured_at))
@@ -321,7 +321,7 @@ export function SocHistoryChart({ measurements }: { measurements: HistoryMeasure
 
   return (
     <div className="chart-block">
-      <h3 className="chart-title">Заряд батареи, %</h3>
+      <h3 className="chart-title">Battery charge, %</h3>
       <div className="chart-row">
         <div className="chart-y-axis" aria-hidden="true">
           {ticks.map((tick) => (
@@ -335,7 +335,7 @@ export function SocHistoryChart({ measurements }: { measurements: HistoryMeasure
             viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
             className="history-chart"
             role="img"
-            aria-label="График заряда батареи по времени"
+            aria-label="Chart of battery charge over time"
           >
             {ticks.map((tick) => (
               <line
