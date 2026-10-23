@@ -6,6 +6,23 @@
 
 namespace database {
 
+namespace {
+
+// libpq returns no result when the query could not be sent, for example when
+// the connection is lost; the reason is then kept on the connection.
+PostgresResult makeResult(PGconn* connection, PGresult* result)
+{
+    if (result) {
+        return PostgresResult(result);
+    }
+
+    return PostgresResult(
+        nullptr,
+        connection ? PQerrorMessage(connection) : "No connection");
+}
+
+} // namespace
+
 void PostgresConnection::ConnectionDeleter::operator()(PGconn* connection) const
 {
     if (connection) {
@@ -24,15 +41,16 @@ bool PostgresConnection::isOk() const
     return m_connection && PQstatus(m_connection.get()) == CONNECTION_OK;
 }
 
-const char* PostgresConnection::errorMessage() const
+std::string PostgresConnection::errorMessage() const
 {
+    std::lock_guard lock(m_mutex);
     return m_connection ? PQerrorMessage(m_connection.get()) : "No connection";
 }
 
 PostgresResult PostgresConnection::execute(const char* query) const
 {
     std::lock_guard lock(m_mutex);
-    return PostgresResult(PQexec(m_connection.get(), query));
+    return makeResult(m_connection.get(), PQexec(m_connection.get(), query));
 }
 
 PostgresResult PostgresConnection::executeParams(
@@ -42,7 +60,8 @@ PostgresResult PostgresConnection::executeParams(
 ) const
 {
     std::lock_guard lock(m_mutex);
-    return PostgresResult(
+    return makeResult(
+        m_connection.get(),
         PQexecParams(
             m_connection.get(),
             query,

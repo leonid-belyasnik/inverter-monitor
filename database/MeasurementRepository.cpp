@@ -138,7 +138,8 @@ MeasurementRepository::MeasurementRepository(PostgresConnection& connection)
 
 std::int64_t MeasurementRepository::save(
     const domain::DeviceId& deviceId,
-    const domain::Measurement& measurement)
+    const domain::Measurement& measurement,
+    DatabaseError* error)
 {
     const std::string measuredAt = formatTimestamp(measurement.measuredAt);
     const auto pvPower = formatOptionalDouble(measurement.pvPower);
@@ -168,8 +169,23 @@ std::int64_t MeasurementRepository::save(
         values
     );
 
-    if (!result.isOk() || result.rowCount() != 1)
+    if (!result.isOk())
     {
+        if (error) {
+            *error = DatabaseError{result.errorMessage(), result.sqlState()};
+        }
+
+        return 0;
+    }
+
+    if (result.rowCount() != 1)
+    {
+        if (error) {
+            *error = DatabaseError{
+                "INSERT returned " + std::to_string(result.rowCount()) + " rows",
+                {}};
+        }
+
         return 0;
     }
 

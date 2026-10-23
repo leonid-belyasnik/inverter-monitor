@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string>
 
 struct pg_conn;
 
@@ -17,7 +18,7 @@ public:
     explicit PostgresConnection(const char* connectionString);
 
     bool isOk() const;
-    const char* errorMessage() const;
+    std::string errorMessage() const;
 
     PostgresResult execute(const char* query) const;
     PostgresResult executeParams(

@@ -32,6 +32,22 @@ add_test(
     COMMAND migration_runner_test
 )
 
+add_executable(postgres_diagnostics_test
+    PostgresDiagnosticsTest.cpp
+)
+
+target_link_libraries(postgres_diagnostics_test
+    PRIVATE
+        application
+        database
+        GTest::gtest_main
+)
+
+add_test(
+    NAME PostgresDiagnosticsTest
+    COMMAND postgres_diagnostics_test
+)
+
 add_executable(telemetry_parser_test
     TelemetryParserTest.cpp
 )

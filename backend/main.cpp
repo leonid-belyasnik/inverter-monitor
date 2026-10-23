@@ -1,9 +1,14 @@
+#include <cctype>
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
+#include <ctime>
 #include <atomic>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <exception>
@@ -52,6 +57,77 @@ int getEnvironmentInt(const char *name, const int defaultValue)
 	}
 }
 
+enum class LogLevel { Info, Warning, Error };
+
+std::mutex logMutex;
+
+std::string utcTimestamp()
+{
+	const auto now = std::chrono::system_clock::now();
+	const auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
+	const auto milliseconds =
+	    std::chrono::duration_cast<std::chrono::milliseconds>(now - seconds).count();
+	const std::time_t time = std::chrono::system_clock::to_time_t(seconds);
+
+	std::tm tm{};
+	gmtime_r(&time, &tm);
+
+	std::ostringstream stream;
+	stream << std::put_time(&tm, "%Y-%m-%dT%H:%M:%S") << '.' << std::setfill('0') << std::setw(3)
+	       << milliseconds << 'Z';
+
+	return stream.str();
+}
+
+// libpq messages may span several lines; each log entry stays on one line.
+std::string singleLine(const std::string &text)
+{
+	std::string result;
+	bool pendingSpace = false;
+
+	for (const char character : text) {
+		if (std::isspace(static_cast<unsigned char>(character))) {
+			pendingSpace = !result.empty();
+			continue;
+		}
+
+		if (pendingSpace) {
+			result += ' ';
+			pendingSpace = false;
+		}
+
+		result += character;
+	}
+
+	return result;
+}
+
+void logMessage(const LogLevel level, const std::string &message)
+{
+	const char *levelName = level == LogLevel::Info      ? "INFO"
+	                        : level == LogLevel::Warning ? "WARN"
+	                                                     : "ERROR";
+	std::ostream &stream = level == LogLevel::Info ? std::cout : std::cerr;
+
+	std::lock_guard lock(logMutex);
+	stream << utcTimestamp() << ' ' << levelName << ' ' << message << std::endl;
+}
+
+std::string describeIngestionError(const application::IngestionError &error)
+{
+	std::string description = singleLine(error.message);
+
+	if (description.empty()) {
+		description = "unknown error";
+	}
+
+	if (!error.sqlState.empty()) {
+		description += " (SQLSTATE " + error.sqlState + ')';
+	}
+
+	return description;
+}
+
 } // namespace
 
 int main()
@@ -63,14 +139,16 @@ int main()
 	database::PostgresConnection databaseConnection("");
 
 	if (!databaseConnection.isOk()) {
-		std::cerr << "Database connection failed: " << databaseConnection.errorMessage() << '\n';
+		logMessage(LogLevel::Error,
+		           "Database connection failed: " + singleLine(databaseConnection.errorMessage()));
 		return 1;
 	}
 
 	database::DatabaseSchema schema(databaseConnection);
 
 	if (!schema.initialize()) {
-		std::cerr << "Database schema initialization failed: " << schema.errorMessage() << '\n';
+		logMessage(LogLevel::Error,
+		           "Database schema initialization failed: " + singleLine(schema.errorMessage()));
 		return 1;
 	}
 
@@ -84,7 +162,8 @@ int main()
 		httpServer = std::make_unique<api::HttpServer>("0.0.0.0", 8080, httpRouter);
 		httpServer->listen();
 	} catch (const std::exception& error) {
-		std::cerr << "HTTP server startup failed on port 8080: " << error.what() << '\n';
+		logMessage(LogLevel::Error,
+		           std::string("HTTP server startup failed on port 8080: ") + error.what());
 		return 1;
 	}
 
@@ -92,7 +171,8 @@ int main()
 	try {
 		webSocketServer = std::make_unique<api::WebSocketServer>("0.0.0.0", 8081);
 	} catch (const std::exception& error) {
-		std::cerr << "WebSocket server startup failed on port 8081: " << error.what() << '\n';
+		logMessage(LogLevel::Error,
+		           std::string("WebSocket server startup failed on port 8081: ") + error.what());
 		return 1;
 	}
 
@@ -110,10 +190,10 @@ int main()
 		try {
 			httpServer->run();
 		} catch (const std::exception& error) {
-			std::cerr << "HTTP server failed: " << error.what() << '\n';
+			logMessage(LogLevel::Error, std::string("HTTP server failed: ") + error.what());
 			httpThreadFailed = true;
 		} catch (...) {
-			std::cerr << "HTTP server failed with an unknown error\n";
+			logMessage(LogLevel::Error, "HTTP server failed with an unknown error");
 			httpThreadFailed = true;
 		}
 	});
@@ -123,15 +203,16 @@ int main()
 			try {
 				webSocketServer->run();
 			} catch (const std::exception& error) {
-				std::cerr << "WebSocket server failed: " << error.what() << '\n';
+				logMessage(LogLevel::Error, std::string("WebSocket server failed: ") + error.what());
 				webSocketThreadFailed = true;
 			} catch (...) {
-				std::cerr << "WebSocket server failed with an unknown error\n";
+				logMessage(LogLevel::Error, "WebSocket server failed with an unknown error");
 				webSocketThreadFailed = true;
 			}
 		});
 	} catch (const std::exception& error) {
-		std::cerr << "WebSocket server thread startup failed: " << error.what() << '\n';
+		logMessage(LogLevel::Error,
+		           std::string("WebSocket server thread startup failed: ") + error.what());
 		httpServer->stop();
 		httpThread.join();
 		return 1;
@@ -146,8 +227,8 @@ int main()
 	std::signal(SIGINT, handleSignal);
 	std::signal(SIGTERM, handleSignal);
 
-	std::cout << "Starting inverter-monitor\n"
-	          << "MQTT broker: " << mqttHost << ':' << mqttPort << '\n';
+	logMessage(LogLevel::Info, "Starting inverter-monitor");
+	logMessage(LogLevel::Info, "MQTT broker: " + mqttHost + ':' + std::to_string(mqttPort));
 
 	mqtt::MqttClient mqtt("inverter-monitor-backend", mqttHost, mqttPort,
 	                      [&telemetryAdapter, &ingestion](const std::string_view topic,
@@ -155,46 +236,57 @@ int main()
 		                      const auto measurement = telemetryAdapter.adapt(topic, payload);
 
 		                      if (!measurement) {
-			                      std::cerr << "Invalid telemetry topic or payload\n";
+			                      logMessage(LogLevel::Warning, "Invalid telemetry topic or payload");
 			                      return;
 		                      }
 
-		                      const auto measurementId = ingestion.ingest(*measurement);
+		                      application::IngestionError error;
+		                      const auto measurementId = ingestion.ingest(*measurement, &error);
+		                      const std::string &deviceId = measurement->deviceId.value;
 
 		                      if (!measurementId) {
-			                      std::cerr << "Failed to persist telemetry for device "
-			                                << measurement->deviceId.value << '\n';
+			                      logMessage(LogLevel::Error,
+			                                 "Failed to persist telemetry for device " + deviceId +
+			                                     ": " + describeIngestionError(error));
 			                      return;
 		                      }
 
-		                      std::cout << "Persisted telemetry for device "
-		                                << measurement->deviceId.value << " as measurement "
-		                                << *measurementId << '\n';
+		                      logMessage(LogLevel::Info, "Persisted telemetry for device " + deviceId +
+		                                                     " as measurement " +
+		                                                     std::to_string(*measurementId));
+
+		                      if (!error.message.empty()) {
+			                      logMessage(LogLevel::Warning,
+			                                 "Measurement " + std::to_string(*measurementId) +
+			                                     " for device " + deviceId +
+			                                     " was persisted, but delivery to WebSocket clients failed: " +
+			                                     describeIngestionError(error));
+		                      }
 	                      });
 
 	if (!mqtt.connect()) {
-		std::cerr << "MQTT connection failed: " << mqtt.errorMessage() << '\n';
+		logMessage(LogLevel::Error, "MQTT connection failed: " + mqtt.errorMessage());
 		stopServers();
 
 		return 1;
 	}
 
 	if (!mqtt.subscribe("v1/devices/+/telemetry")) {
-		std::cerr << "MQTT subscribe failed: " << mqtt.errorMessage() << '\n';
+		logMessage(LogLevel::Error, "MQTT subscribe failed: " + mqtt.errorMessage());
 		stopServers();
 
 		return 1;
 	}
 
 	if (!mqtt.startLoop()) {
-		std::cerr << "MQTT loop start failed: " << mqtt.errorMessage() << '\n';
+		logMessage(LogLevel::Error, "MQTT loop start failed: " + mqtt.errorMessage());
 		stopServers();
 
 		return 1;
 	}
 
-	std::cout << "MQTT client is running\n"
-	          << "Waiting for telemetry...\n";
+	logMessage(LogLevel::Info, "MQTT client is running");
+	logMessage(LogLevel::Info, "Waiting for telemetry...");
 
 	while (!stopRequested && !httpThreadFailed && !webSocketThreadFailed) {
 		std::this_thread::sleep_for(std::chrono::seconds(1));

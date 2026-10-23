@@ -2,6 +2,8 @@
 
 #include <libpq-fe.h>
 
+#include <utility>
+
 namespace database {
 
 void PostgresResult::ResultDeleter::operator()(PGresult* result) const
@@ -10,8 +12,9 @@ void PostgresResult::ResultDeleter::operator()(PGresult* result) const
         PQclear(result);
 }
 
-PostgresResult::PostgresResult(PGresult* result)
+PostgresResult::PostgresResult(PGresult* result, std::string fallbackError)
     : m_result(result)
+    , m_fallbackError(std::move(fallbackError))
 {
 }
 
@@ -49,7 +52,22 @@ bool PostgresResult::isNull(const int row, const int column) const
 
 const char* PostgresResult::errorMessage() const
 {
-    return m_result ? PQresultErrorMessage(m_result.get()) : "No result";
+    if (m_result) {
+        return PQresultErrorMessage(m_result.get());
+    }
+
+    return m_fallbackError.empty() ? "No result" : m_fallbackError.c_str();
+}
+
+std::string PostgresResult::sqlState() const
+{
+    if (!m_result) {
+        return {};
+    }
+
+    const char* state = PQresultErrorField(m_result.get(), PG_DIAG_SQLSTATE);
+
+    return state ? state : "";
 }
 
 PGresult* PostgresResult::get() const
