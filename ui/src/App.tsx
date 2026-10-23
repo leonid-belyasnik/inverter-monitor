@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      App.tsx
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 import './App.css'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { deviceConfig, sourceLabel } from './deviceConfig'

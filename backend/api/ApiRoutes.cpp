@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      ApiRoutes.cpp
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 #include "ApiRoutes.h"
 
 #include <boost/json.hpp>

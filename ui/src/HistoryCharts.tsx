@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      HistoryCharts.tsx
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 // History charts rendered as plain SVG (no charting dependency).
 // Data is supplied by App (REST history merged with live WebSocket
 // measurements); this view does not fetch or merge on its own.

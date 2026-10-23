@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      WebSocketServer.cpp
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 #include "WebSocketServer.h"
 
 #include <utility>

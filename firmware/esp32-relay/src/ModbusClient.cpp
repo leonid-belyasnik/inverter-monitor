@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      ModbusClient.cpp
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 #include "ModbusClient.h"
 
 #include "Config.h"

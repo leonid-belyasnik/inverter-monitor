@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      ApiFormatting.cpp
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 #include "ApiFormatting.h"
 
 #include <iomanip>

@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      MqttClient.cpp
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 #include "MqttClient.h"
 
 #include <mosquitto.h>

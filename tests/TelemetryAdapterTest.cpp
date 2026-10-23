@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      TelemetryAdapterTest.cpp
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 #include <string>
 
 #include <gtest/gtest.h>

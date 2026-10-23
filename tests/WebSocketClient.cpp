@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      WebSocketClient.cpp
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 #include <iostream>
 
 #include <boost/asio.hpp>

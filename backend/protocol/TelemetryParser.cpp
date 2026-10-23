@@ -1,3 +1,12 @@
+/******************************************************************************
+**
+** File      TelemetryParser.cpp
+** Copyright (c) 2026 Leonid Belyasnik.
+**
+** Part of the HomePowerGuard project.
+**
+******************************************************************************/
+
 #include "TelemetryParser.h"
 
 #include <chrono>
