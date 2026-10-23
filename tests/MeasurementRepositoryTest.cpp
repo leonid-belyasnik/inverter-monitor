@@ -49,7 +49,8 @@ TEST(MeasurementRepositoryTest, IngestsAndPersistsMeasurementWithDeviceId)
         "grid_power_w": -100.0,
         "battery_power_w": 500.0,
         "load_power_w": 1634.0,
-        "battery_soc_pct": 75.0
+        "battery_soc_pct": 75.0,
+        "grid_voltage_v": 230.4
     }
 }
 )json";
@@ -68,7 +69,7 @@ TEST(MeasurementRepositoryTest, IngestsAndPersistsMeasurementWithDeviceId)
         << "Failed to ingest measurement";
 
     const std::string query =
-        "SELECT device_id, pv_power, grid_power, battery_power, load_power, battery_soc "
+        "SELECT device_id, pv_power, grid_power, battery_power, load_power, battery_soc, grid_voltage "
         "FROM measurements "
         "WHERE id = " + std::to_string(*measurementId);
 
@@ -86,6 +87,7 @@ TEST(MeasurementRepositoryTest, IngestsAndPersistsMeasurementWithDeviceId)
     EXPECT_DOUBLE_EQ(std::stod(result.value(0, 3)), 500.0);
     EXPECT_DOUBLE_EQ(std::stod(result.value(0, 4)), 1634.0);
     EXPECT_DOUBLE_EQ(std::stod(result.value(0, 5)), 75.0);
+    EXPECT_DOUBLE_EQ(std::stod(result.value(0, 6)), 230.4);
 
     const auto rollbackResult = connection.execute("ROLLBACK");
 
@@ -186,7 +188,8 @@ TEST(MeasurementRepositoryTest, PersistsAndReadsMissingOptionalFieldsAsNull)
         .gridPower = std::nullopt,
         .batteryPower = -203.0,
         .loadPower = std::nullopt,
-        .batterySoc = 98.0
+        .batterySoc = 98.0,
+        .gridVoltage = std::nullopt
     };
 
     const auto measurementId = repository.save(deviceId, measurement);
@@ -194,7 +197,7 @@ TEST(MeasurementRepositoryTest, PersistsAndReadsMissingOptionalFieldsAsNull)
     ASSERT_NE(measurementId, 0);
 
     const std::string query =
-        "SELECT pv_power, grid_power, battery_power, load_power, battery_soc "
+        "SELECT pv_power, grid_power, battery_power, load_power, battery_soc, grid_voltage "
         "FROM measurements "
         "WHERE id = " + std::to_string(measurementId);
 
@@ -210,6 +213,7 @@ TEST(MeasurementRepositoryTest, PersistsAndReadsMissingOptionalFieldsAsNull)
     EXPECT_FALSE(result.isNull(0, 2));
     EXPECT_TRUE(result.isNull(0, 3));
     EXPECT_FALSE(result.isNull(0, 4));
+    EXPECT_TRUE(result.isNull(0, 5));
     EXPECT_DOUBLE_EQ(std::stod(result.value(0, 2)), -203.0);
     EXPECT_DOUBLE_EQ(std::stod(result.value(0, 4)), 98.0);
 
@@ -220,8 +224,71 @@ TEST(MeasurementRepositoryTest, PersistsAndReadsMissingOptionalFieldsAsNull)
     EXPECT_FALSE(records[0].measurement.pvPower.has_value());
     EXPECT_FALSE(records[0].measurement.gridPower.has_value());
     EXPECT_FALSE(records[0].measurement.loadPower.has_value());
+    EXPECT_FALSE(records[0].measurement.gridVoltage.has_value());
     EXPECT_DOUBLE_EQ(records[0].measurement.batteryPower, -203.0);
     EXPECT_DOUBLE_EQ(records[0].measurement.batterySoc, 98.0);
+
+    const auto rollbackResult = connection.execute("ROLLBACK");
+
+    ASSERT_TRUE(rollbackResult.isOk())
+        << "Failed to rollback transaction";
+}
+
+TEST(MeasurementRepositoryTest, PersistsAndReadsGridVoltageIncludingZero)
+{
+    database::PostgresConnection connection("");
+
+    ASSERT_TRUE(connection.isOk())
+        << "Connection failed: "
+        << connection.errorMessage();
+
+    database::DatabaseSchema schema(connection);
+
+    ASSERT_TRUE(schema.initialize())
+        << "Schema initialization failed";
+
+    const auto beginResult = connection.execute("BEGIN");
+
+    ASSERT_TRUE(beginResult.isOk())
+        << "Failed to begin transaction";
+
+    database::MeasurementRepository repository(connection);
+
+    const domain::DeviceId deviceId{"deye-grid-voltage-test"};
+
+    const domain::Measurement withVoltage{
+        .measuredAt = std::chrono::system_clock::from_time_t(1779706200),
+        .pvPower = std::nullopt,
+        .gridPower = std::nullopt,
+        .batteryPower = 100.0,
+        .loadPower = std::nullopt,
+        .batterySoc = 50.0,
+        .gridVoltage = 231.5
+    };
+
+    const domain::Measurement zeroVoltage{
+        .measuredAt = std::chrono::system_clock::from_time_t(1779706260),
+        .pvPower = std::nullopt,
+        .gridPower = std::nullopt,
+        .batteryPower = 100.0,
+        .loadPower = std::nullopt,
+        .batterySoc = 50.0,
+        .gridVoltage = 0.0
+    };
+
+    ASSERT_NE(repository.save(deviceId, withVoltage), 0);
+    ASSERT_NE(repository.save(deviceId, zeroVoltage), 0);
+
+    const auto records = repository.findByDevice(deviceId, 100);
+
+    ASSERT_EQ(records.size(), 2);
+
+    // Newest first: the zero value must stay a value, not become empty.
+    ASSERT_TRUE(records[0].measurement.gridVoltage.has_value());
+    EXPECT_DOUBLE_EQ(records[0].measurement.gridVoltage.value(), 0.0);
+
+    ASSERT_TRUE(records[1].measurement.gridVoltage.has_value());
+    EXPECT_DOUBLE_EQ(records[1].measurement.gridVoltage.value(), 231.5);
 
     const auto rollbackResult = connection.execute("ROLLBACK");
 

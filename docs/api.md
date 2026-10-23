@@ -58,7 +58,8 @@ GET /api/v1/devices/simulator-001/measurements?limit=3
       "grid_power": -200.0,
       "battery_power": -543.28,
       "load_power": 1531.44,
-      "battery_soc": 73.06
+      "battery_soc": 73.06,
+      "grid_voltage": 230.4
     }
   ]
 }
@@ -68,7 +69,7 @@ The example shows the response structure; actual values and the number of return
 
 Timestamps use ISO 8601 UTC format.
 
-Every measurement object always contains all six keys. `measured_at` is always a string; `battery_power` and `battery_soc` are always numbers. `pv_power`, `grid_power`, and `load_power` are `null` when the telemetry source did not provide the value (see [Telemetry Input](architecture.md#protocol)); `null` means "unavailable", never zero. Example of a record from a source that publishes only battery values:
+Every measurement object always contains all seven keys. `measured_at` is always a string; `battery_power` and `battery_soc` are always numbers. `pv_power`, `grid_power`, `load_power`, and `grid_voltage` are `null` when the telemetry source did not provide the value (see [Telemetry Input](architecture.md#protocol)); `null` means "unavailable", never zero. A reported `grid_voltage` of `0` is a real value and is returned as `0`, not `null`. `grid_voltage` is in volts; the telemetry input field is `grid_voltage_v`. Example of a record from a source that publishes only battery values:
 
 ```json
 {
@@ -77,7 +78,8 @@ Every measurement object always contains all six keys. `measured_at` is always a
   "grid_power": null,
   "battery_power": -203.0,
   "load_power": null,
-  "battery_soc": 98.0
+  "battery_soc": 98.0,
+  "grid_voltage": null
 }
 ```
 
@@ -132,12 +134,13 @@ Example:
     "grid_power": -200.0,
     "battery_power": -543.28,
     "load_power": 1531.44,
-    "battery_soc": 73.06
+    "battery_soc": 73.06,
+    "grid_voltage": 230.4
   }
 }
 ```
 
-The `device_id` identifies the source device. Measurement values are contained in the `data` object, which has the same shape as a REST measurement object, including `null` for unavailable `pv_power`, `grid_power`, and `load_power`.
+The `device_id` identifies the source device. Measurement values are contained in the `data` object, which has the same shape as a REST measurement object, including `null` for unavailable `pv_power`, `grid_power`, `load_power`, and `grid_voltage`.
 
 Timestamps use ISO 8601 UTC format.
 

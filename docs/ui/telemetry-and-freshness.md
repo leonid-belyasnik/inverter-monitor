@@ -6,7 +6,7 @@ The main runtime serves REST on port `8080`.
 
 * `GET /api/v1/health` returns plain text `OK\n` when the HTTP route responds. It does not report MQTT state or telemetry freshness.
 * `GET /api/v1/devices/{deviceId}/measurements?limit=N` returns `{ "device_id": "...", "measurements": [...] }`. `limit` defaults to 100. The code parses it with `std::stoul` and uses values from 1 through 1000; missing values, conversion failures, and parsed values outside that range use the default. Because the code does not check that the whole string was consumed, a numeric prefix with trailing characters can be accepted (for example, `3x` may be parsed as `3`). This is the current implementation behavior; strict validation is an open API issue. Records are ordered newest-first by `measured_at`.
-* Each measurement currently contains `measured_at`, `pv_power`, `grid_power`, `battery_power`, `load_power`, and `battery_soc`. Timestamps are serialized as ISO 8601 UTC strings. `pv_power`, `grid_power`, and `load_power` are `null` when the source did not provide them; `battery_power` and `battery_soc` are always numbers. There is no record ID, `backend_received_at`, voltage, quality flag, or source-kind field in this response.
+* Each measurement currently contains `measured_at`, `pv_power`, `grid_power`, `battery_power`, `load_power`, `battery_soc`, and `grid_voltage`. Timestamps are serialized as ISO 8601 UTC strings. `pv_power`, `grid_power`, `load_power`, and `grid_voltage` are `null` when the source did not provide them; `battery_power` and `battery_soc` are always numbers. There is no record ID, `backend_received_at`, quality flag, or source-kind field in this response.
 
 ## Current WebSocket Contract
 
@@ -42,12 +42,13 @@ The client considers subscription confirmed only when `type` is `subscribed` and
     "grid_power": -200.0,
     "battery_power": -543.28,
     "load_power": 1531.44,
-    "battery_soc": 73.06
+    "battery_soc": 73.06,
+    "grid_voltage": 230.4
   }
 }
 ```
 
-`data` uses the same `null` rule as REST for `pv_power`, `grid_power`, and `load_power`. The UI must show `null` as unavailable, never as zero.
+`data` uses the same `null` rule as REST for `pv_power`, `grid_power`, `load_power`, and `grid_voltage`. The UI must show `null` as unavailable, never as zero.
 
 Subscription does not send a snapshot of the most recent measurement. The client should load initial/history data through REST and use WebSocket for subsequent updates. The current WebSocket measurement message also has no `backend_received_at`, record ID, sequence number, or source-kind field.
 
@@ -59,7 +60,7 @@ The ESP32 beta firmware (`firmware/esp32-relay`) publishes `battery_soc_pct` (%)
 
 The simulator code comments define its battery convention: positive `battery_power` means discharge; negative means charge. The ESP32 firmware uses the same convention, but for the real inverter the sign has only been observed while charging; the discharge sign still requires hardware verification. PV and load are generated as positive values by the simulator. The simulator sets `grid_power` to `-200`, but code does not document whether negative means import or export. The backend does not normalize or validate these signs. Until source conventions are confirmed, preserve signed values and avoid import/export labels or derived flow diagrams. Exact grid-power sign semantics for real telemetry remain an open question.
 
-Grid voltage is absent from the domain measurement, parser input, database, REST, and WebSocket contracts. It is unavailable to the beta until its source and field are confirmed.
+Grid voltage is an optional field: `grid_voltage_v` (V) in MQTT telemetry input, `grid_voltage` in the domain measurement, PostgreSQL, REST, and WebSocket. It is `null` when the source did not provide it; a reported `0` stays `0`. The simulator and the current ESP32 firmware do not publish it, so it is `null` for them. No plausibility threshold or grid-presence rule is applied: the backend stores and returns the number as received.
 
 ## Three Distinct Times
 
@@ -93,7 +94,7 @@ The browser should handle malformed or unexpected messages as a visible connecti
 
 ## Open Questions
 
-* Which real source supplies grid voltage, and in what field/unit?
+* Is the Deye register that the ESP32 firmware would use for grid voltage verified, and what value does it report when the grid is absent? The firmware does not publish `grid_voltage_v` yet.
 * Are all real source power values in watts and state of charge in percent?
 * What are the real sign conventions, especially for grid power?
 * What is the normal real telemetry interval and acceptable stale threshold?

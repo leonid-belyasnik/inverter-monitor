@@ -6,6 +6,8 @@ add_library(database STATIC)
 set(sources
     DatabaseSchema.cpp
     MeasurementRepository.cpp
+    MigrationRunner.cpp
+    Migrations.cpp
     PostgresConnection.cpp
     PostgresResult.cpp
 )
@@ -13,6 +15,9 @@ set(sources
 set(headers
     DatabaseSchema.h
     MeasurementRepository.h
+    Migration.h
+    MigrationRunner.h
+    Migrations.h
     PostgresConnection.h
     PostgresResult.h
 )

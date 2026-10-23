@@ -63,7 +63,7 @@ The backend currently binds HTTP and WebSocket to `0.0.0.0`; this listens on all
 * Interrupt the browser's WebSocket path, restore it, and confirm reconnect, resubscription, and arrival of fresh data.
 * Stop or make the REST service unavailable and confirm the initial/history error is distinct from WebSocket state.
 * Open the UI on an iPhone over home Wi-Fi and verify layout, REST loading, WebSocket updates, and recovery after Wi-Fi interruption.
-* Confirm voltage remains explicitly unavailable until a source is implemented and confirmed.
+* With the simulator, which does not publish `grid_voltage_v`, confirm the «Напряжение сети» card shows «Недоступно». To check the supported path, publish a telemetry message containing `measurement.grid_voltage_v` and confirm the card shows the value with one decimal place and «В» (for example, «230,4 В»), and returns to «Недоступно» when a later message has it `null` or absent. This checks UI and backend support only; it does not confirm Deye register 150 as a reliable voltage source.
 
 ## Documentation Note
 

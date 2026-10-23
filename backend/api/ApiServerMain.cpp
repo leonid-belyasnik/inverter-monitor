@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include <application/MeasurementQueryService.h>
 
 #include <database/MeasurementRepository.h>
@@ -22,6 +24,7 @@ int main()
 
     if (!schema.initialize())
     {
+        std::cerr << "Database schema initialization failed: " << schema.errorMessage() << '\n';
         return 1;
     }
 

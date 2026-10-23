@@ -5,8 +5,8 @@
 
 namespace domain {
 
-// pvPower, gridPower, and loadPower are empty when the source did not
-// provide a value; they must never be substituted with zero.
+// pvPower, gridPower, loadPower, and gridVoltage are empty when the source did
+// not provide a value; they must never be substituted with zero.
 struct Measurement
 {
 	std::chrono::system_clock::time_point measuredAt;
@@ -15,6 +15,7 @@ struct Measurement
     double batteryPower;
     std::optional<double> loadPower;
     double batterySoc;
+    std::optional<double> gridVoltage;
 };
 
 } // namespace domain

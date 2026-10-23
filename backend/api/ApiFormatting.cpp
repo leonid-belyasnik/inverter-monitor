@@ -56,6 +56,7 @@ boost::json::object formatMeasurement(const domain::Measurement& measurement)
     object["battery_power"] = measurement.batteryPower;
     object["load_power"] = optionalValue(measurement.loadPower);
     object["battery_soc"] = measurement.batterySoc;
+    object["grid_voltage"] = optionalValue(measurement.gridVoltage);
 
     return object;
 }

@@ -1,7 +1,7 @@
 #include "DatabaseSchema.h"
 
-#include "PostgresConnection.h"
-#include "PostgresResult.h"
+#include "MigrationRunner.h"
+#include "Migrations.h"
 
 namespace database {
 
@@ -12,37 +12,18 @@ DatabaseSchema::DatabaseSchema(PostgresConnection& connection)
 
 bool DatabaseSchema::initialize()
 {
-    const auto createResult = m_connection.execute(
-        "CREATE TABLE IF NOT EXISTS measurements ("
-        "    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
-        "    device_id       text NOT NULL,"
-        "    measured_at     timestamptz NOT NULL,"
-        "    pv_power        double precision,"
-        "    grid_power      double precision,"
-        "    battery_power   double precision,"
-        "    load_power      double precision,"
-        "    battery_soc     double precision"
-        ")"
-    );
+    MigrationRunner runner(m_connection, allMigrations());
 
-    if (!createResult.isOk()) {
-        return false;
-    }
+    const auto result = runner.run();
 
-    const auto migrationResult = m_connection.execute(
-        "ALTER TABLE measurements "
-        "ADD COLUMN IF NOT EXISTS device_id text NOT NULL DEFAULT 'unknown'"
-    );
+    m_errorMessage = result.error;
 
-    if (!migrationResult.isOk()) {
-        return false;
-    }
+    return result.ok;
+}
 
-    const auto defaultResult = m_connection.execute(
-        "ALTER TABLE measurements ALTER COLUMN device_id DROP DEFAULT"
-    );
-
-    return defaultResult.isOk();
+const std::string& DatabaseSchema::errorMessage() const
+{
+    return m_errorMessage;
 }
 
 } // namespace database

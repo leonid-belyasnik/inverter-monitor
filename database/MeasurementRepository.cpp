@@ -146,6 +146,7 @@ std::int64_t MeasurementRepository::save(
     const std::string batteryPower = formatDouble(measurement.batteryPower);
     const auto loadPower = formatOptionalDouble(measurement.loadPower);
     const std::string batterySoc = formatDouble(measurement.batterySoc);
+    const auto gridVoltage = formatOptionalDouble(measurement.gridVoltage);
 
     const char* values[] = {
         deviceId.value.c_str(),
@@ -154,15 +155,16 @@ std::int64_t MeasurementRepository::save(
         parameterValue(gridPower),
         batteryPower.c_str(),
         parameterValue(loadPower),
-        batterySoc.c_str()
+        batterySoc.c_str(),
+        parameterValue(gridVoltage)
     };
 
     const auto result = m_connection.executeParams(
         "INSERT INTO measurements "
-        "(device_id, measured_at, pv_power, grid_power, battery_power, load_power, battery_soc) "
-        "VALUES ($1, $2, $3, $4, $5, $6, $7) "
+        "(device_id, measured_at, pv_power, grid_power, battery_power, load_power, battery_soc, grid_voltage) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) "
         "RETURNING id",
-        7,
+        8,
         values
     );
 
@@ -187,7 +189,7 @@ std::vector<MeasurementRecord> MeasurementRepository::findByDevice(
 
     const auto result = m_connection.executeParams(
         "SELECT device_id, measured_at, pv_power, grid_power, "
-        "battery_power, load_power, battery_soc "
+        "battery_power, load_power, battery_soc, grid_voltage "
         "FROM measurements "
         "WHERE device_id = $1 "
         "ORDER BY measured_at DESC "
@@ -225,6 +227,8 @@ std::vector<MeasurementRecord> MeasurementRepository::findByDevice(
             optionalDouble(result, row, 5);
         record.measurement.batterySoc =
             std::stod(result.value(row, 6));
+        record.measurement.gridVoltage =
+            optionalDouble(result, row, 7);
 
         records.push_back(std::move(record));
     }

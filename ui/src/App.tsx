@@ -38,6 +38,7 @@ type Measurement = {
   battery_power: number | null
   load_power: number | null
   battery_soc: number | null
+  grid_voltage: number | null
 }
 
 type SocketState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error'
@@ -74,7 +75,7 @@ type ApiState =
   | { status: 'error'; message: string }
   | { status: 'success'; measurements: Measurement[] }
 
-type MetricKey = 'battery_soc' | 'pv_power' | 'load_power' | 'grid_power' | 'battery_power'
+type MetricKey = 'battery_soc' | 'pv_power' | 'load_power' | 'grid_power' | 'battery_power' | 'grid_voltage'
 type MeasurementKey = MetricKey
 
 const HISTORY_LIMIT = 100
@@ -86,14 +87,16 @@ const metrics: {
   description: string
   key: MetricKey | null
   unit: string
+  fractionDigits?: number
 }[] = [
   {
     title: 'Напряжение сети',
     icon: 'grid',
     tone: 'violet',
-    description: 'Поле напряжения отсутствует в API',
-    key: null,
+    description: 'Значение как получено от устройства',
+    key: 'grid_voltage',
     unit: 'В',
+    fractionDigits: 1,
   },
   {
     title: 'Мощность сети',
@@ -173,6 +176,7 @@ function parseMeasurements(payload: unknown): Measurement[] {
       grid_power: readValue('grid_power'),
       battery_power: readValue('battery_power'),
       load_power: readValue('load_power'),
+      grid_voltage: readValue('grid_voltage'),
     }
   })
 }
@@ -186,6 +190,16 @@ function mergeHistory(restHistory: Measurement[], liveHistory: Measurement[]): M
   ]
     .sort((a, b) => Date.parse(a.measured_at) - Date.parse(b.measured_at))
     .slice(-HISTORY_LIMIT)
+}
+
+// Without fractionDigits the number is shown exactly as received. null is never shown as a number.
+function formatMetricNumber(value: number | null, fractionDigits?: number): string {
+  if (value === null) return 'Недоступно'
+  if (fractionDigits === undefined) return String(value)
+  return value.toLocaleString('ru-RU', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })
 }
 
 function formatMeasurementTime(value: string): string {
@@ -409,7 +423,7 @@ function App() {
                     : apiState.status === 'loading'
                     ? 'Загрузка…'
                     : latestMeasurement?.[metric.key] !== null && latestMeasurement?.[metric.key] !== undefined
-                      ? `${latestMeasurement[metric.key]} ${metric.unit}`
+                      ? `${formatMetricNumber(latestMeasurement[metric.key], metric.fractionDigits)} ${metric.unit}`
                       : 'Недоступно'}
                 </p>
                 <p className="metric-description">{metric.description}</p>

@@ -17,6 +17,21 @@ add_test(
     COMMAND measurement_repository_test
 )
 
+add_executable(migration_runner_test
+    MigrationRunnerTest.cpp
+)
+
+target_link_libraries(migration_runner_test
+    PRIVATE
+        database
+        GTest::gtest_main
+)
+
+add_test(
+    NAME MigrationRunnerTest
+    COMMAND migration_runner_test
+)
+
 add_executable(telemetry_parser_test
     TelemetryParserTest.cpp
 )

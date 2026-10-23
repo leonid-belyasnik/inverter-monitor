@@ -70,7 +70,7 @@ int main()
 	database::DatabaseSchema schema(databaseConnection);
 
 	if (!schema.initialize()) {
-		std::cerr << "Database schema initialization failed\n";
+		std::cerr << "Database schema initialization failed: " << schema.errorMessage() << '\n';
 		return 1;
 	}
 

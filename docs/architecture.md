@@ -44,7 +44,7 @@ The domain layer contains core application concepts independent of infrastructur
 Main types include:
 
 * `domain::DeviceId` — identifies an inverter or other telemetry source.
-* `domain::Measurement` — represents measurement values. `pvPower`, `gridPower`, and `loadPower` are `std::optional<double>`; an empty value means the source did not provide it and is stored as SQL `NULL`, never as zero.
+* `domain::Measurement` — represents measurement values. `pvPower`, `gridPower`, `loadPower`, and `gridVoltage` are `std::optional<double>`; an empty value means the source did not provide it and is stored as SQL `NULL`, never as zero.
 
 Device identification is modeled separately from measurement values.
 
@@ -57,10 +57,10 @@ The protocol layer handles the conversion of incoming telemetry payloads into ap
 Telemetry input (`schema_version` 1):
 
 * `measured_at` (ISO 8601 UTC with 1–3 fractional digits and `Z`), `measurement.battery_power_w`, and `measurement.battery_soc_pct` are required numbers.
-* `measurement.pv_power_w`, `measurement.grid_power_w`, and `measurement.load_power_w` are optional. They may be absent or `null`; either is treated as unavailable.
+* `measurement.pv_power_w`, `measurement.grid_power_w`, `measurement.load_power_w`, and `measurement.grid_voltage_v` (volts) are optional. They may be absent or `null`; either is treated as unavailable. A value of `0` is a number, not unavailable.
 * Any present field with a non-numeric value, or any missing required field, rejects the whole message.
 
-The simulator always sends all five measurement fields. The ESP32 firmware omits a field when its register is disabled or its read fails in that cycle.
+The simulator always sends the five power and state-of-charge fields and does not send `grid_voltage_v`. The ESP32 firmware omits a field when its register is disabled or its read fails in that cycle; it does not yet publish `grid_voltage_v`. In the domain, PostgreSQL (`grid_voltage` column), REST, and WebSocket the voltage is named `grid_voltage`.
 
 Protocol-specific parsing logic remains outside the domain layer.
 
@@ -101,6 +101,26 @@ The database layer provides PostgreSQL persistence.
 `database::MeasurementRepository` encapsulates database access, including storing measurements and querying stored data.
 
 Measurements are associated with a device identifier so that stored telemetry can be retrieved for a specific device.
+
+#### Schema Migrations
+
+The database schema is versioned independently of the backend version. `database::DatabaseSchema::initialize()` runs `database::MigrationRunner` with the ordered list from `database/Migrations.cpp`; on failure, `errorMessage()` describes the cause and both executables stop with that message.
+
+* Applied versions are stored in `schema_migrations` (`version`, `name`, `applied_at`) in the connection's current schema.
+* The migration list is validated before any database access: versions are positive, unique and strictly increasing; names and SQL are not empty.
+* Pending migrations run in ascending order. Each migration runs in its own transaction together with its `schema_migrations` record, so a version is recorded only after its SQL succeeds. On error the transaction is rolled back and later migrations are not run.
+* Each transaction takes `pg_advisory_xact_lock` with a `lock_timeout` (30 s by default) and re-reads applied versions after obtaining the lock, so concurrent backend instances apply each migration once.
+* Startup fails if the database contains a version unknown to the backend (for example, a newer schema) or if the history has a gap.
+* `PostgresConnection` serializes single calls, not transactions. Migrations must run before the connection is shared with other threads.
+
+Rules for adding migrations:
+
+* Add a new version at the end of the list; never edit or renumber an applied migration.
+* Migrations are forward-only. There are no automatic rollbacks or destructive changes; restoring a previous state requires a backup.
+* Migration SQL must not contain `BEGIN`/`COMMIT` or statements that cannot run inside a transaction, such as `CREATE INDEX CONCURRENTLY`.
+* Versions 1–3 use `IF NOT EXISTS` so that databases created before versioning are adopted without changes to existing data. New migrations should not hide schema drift this way.
+
+Migration tests run in a separate PostgreSQL schema per test with `search_path` set only to that schema, and drop it afterwards.
 
 ### API
 

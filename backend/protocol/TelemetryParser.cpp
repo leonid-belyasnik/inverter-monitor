@@ -107,6 +107,9 @@ std::optional<domain::Measurement> TelemetryParser::parse(
         result.batterySoc =
             measurement.at("battery_soc_pct").to_number<double>();
 
+        result.gridVoltage =
+            optionalNumber(measurement, "grid_voltage_v");
+
         const auto measuredAt =
             parseTimestamp(object.at("measured_at").as_string());
 
