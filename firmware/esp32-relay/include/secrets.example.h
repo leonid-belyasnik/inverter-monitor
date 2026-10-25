@@ -19,6 +19,8 @@
 //
 //   cp include/secrets.example.h include/secrets.h
 //
+// All values are defaults: a configuration saved in NVS through the Serial
+// "config" commands takes precedence (see README.md).
 namespace secrets {
 
 constexpr const char *WIFI_SSID = "YOUR_WIFI_SSID";

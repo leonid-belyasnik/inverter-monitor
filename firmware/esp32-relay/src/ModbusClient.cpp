@@ -65,9 +65,77 @@ void ModbusClient::begin(uint32_t baud, int rxPin, int txPin)
 	digitalWrite(m_dePin, LOW);
 
 	m_serial.begin(baud, SERIAL_8N1, rxPin, txPin);
+	m_baud = baud;
+}
+
+void ModbusClient::setIdleCallback(void (*callback)())
+{
+	m_idleCallback = callback;
+}
+
+void ModbusClient::setSlaveId(uint8_t slaveId)
+{
+	m_slaveId = slaveId;
+}
+
+void ModbusClient::setBaudRate(uint32_t baud)
+{
+	m_serial.updateBaudRate(baud);
+	m_baud = baud;
+}
+
+uint8_t ModbusClient::slaveId() const
+{
+	return m_slaveId;
+}
+
+uint32_t ModbusClient::baudRate() const
+{
+	return m_baud;
+}
+
+ReadStatus ModbusClient::lastStatus() const
+{
+	return m_lastStatus;
+}
+
+bool ModbusClient::hasValidResponse() const
+{
+	return m_hasValidResponse;
+}
+
+uint32_t ModbusClient::lastValidResponseMs() const
+{
+	return m_lastValidResponseMs;
+}
+
+uint32_t ModbusClient::validResponseCount() const
+{
+	return m_validResponseCount;
+}
+
+uint32_t ModbusClient::failedRequestCount() const
+{
+	return m_failedRequestCount;
 }
 
 ReadResult ModbusClient::readHoldingRegister(uint16_t address)
+{
+	const ReadResult result = readOnce(address);
+
+	m_lastStatus = result.status;
+	if (result.status == ReadStatus::Ok || result.status == ReadStatus::ExceptionResponse) {
+		m_hasValidResponse = true;
+		m_lastValidResponseMs = millis();
+		++m_validResponseCount;
+	} else {
+		++m_failedRequestCount;
+	}
+
+	return result;
+}
+
+ReadResult ModbusClient::readOnce(uint16_t address)
 {
 	ReadResult result;
 
@@ -115,6 +183,10 @@ ReadResult ModbusClient::readHoldingRegister(uint16_t address)
 			if (response[1] == 0x03 && length >= 5 + response[2]) {
 				break;
 			}
+		}
+
+		if (m_idleCallback != nullptr) {
+			m_idleCallback();
 		}
 
 		delay(1);

@@ -12,8 +12,9 @@
 #include <cstdint>
 #include <ctime>
 
-// Non-secret deployment knobs. Wi-Fi credentials, MQTT broker address, and
-// the device id live in secrets.h (gitignored); see secrets.example.h.
+// Non-secret deployment knobs. Default Wi-Fi credentials, MQTT broker
+// settings, and the device id live in secrets.h (gitignored); see
+// secrets.example.h.
 namespace config {
 
 // ---- RS485 / Modbus wiring (verified against the physical inverter) ----
@@ -21,6 +22,7 @@ constexpr int RS485_TX_PIN = 17;
 constexpr int RS485_RX_PIN = 18;
 constexpr int RS485_DE_PIN = 21;
 
+// Defaults; can be changed at runtime with the Serial "config" commands.
 constexpr uint32_t MODBUS_BAUD = 9600;
 constexpr uint8_t MODBUS_SLAVE_ID = 1;
 constexpr uint32_t MODBUS_RESPONSE_TIMEOUT_MS = 500;

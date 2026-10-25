@@ -15,7 +15,7 @@
 #include <atomic>
 
 #include "Config.h"
-#include "secrets.h"
+#include "ConsoleLog.h"
 
 namespace telemetry {
 
@@ -122,7 +122,7 @@ void logWifiEvents()
 {
 	const uint32_t dropped = s_wifiEventsDropped.exchange(0, std::memory_order_relaxed);
 	if (dropped != 0) {
-		Serial.printf("Wi-Fi events dropped: %lu\n", static_cast<unsigned long>(dropped));
+		consolelog::printf("Wi-Fi events dropped: %lu\n", static_cast<unsigned long>(dropped));
 	}
 
 	uint32_t tail = s_wifiEventTail.load(std::memory_order_relaxed);
@@ -137,21 +137,21 @@ void logWifiEvents()
 
 		switch (record.id) {
 			case ARDUINO_EVENT_WIFI_STA_CONNECTED:
-				Serial.printf("Wi-Fi event: STA_CONNECTED, status=%d\n", status);
+				consolelog::printf("Wi-Fi event: STA_CONNECTED, status=%d\n", status);
 				break;
 			case ARDUINO_EVENT_WIFI_STA_GOT_IP:
 				if (status == WL_CONNECTED) {
-					Serial.printf("Wi-Fi event: STA_GOT_IP, status=%d, IP %s, RSSI %d dBm\n",
-					              status, WiFi.localIP().toString().c_str(), WiFi.RSSI());
+					consolelog::printf("Wi-Fi event: STA_GOT_IP, status=%d, IP %s, RSSI %d dBm\n",
+					                   status, WiFi.localIP().toString().c_str(), WiFi.RSSI());
 				} else {
-					Serial.printf("Wi-Fi event: STA_GOT_IP, status=%d\n", status);
+					consolelog::printf("Wi-Fi event: STA_GOT_IP, status=%d\n", status);
 				}
 				break;
 			case ARDUINO_EVENT_WIFI_STA_LOST_IP:
-				Serial.printf("Wi-Fi event: STA_LOST_IP, status=%d\n", status);
+				consolelog::printf("Wi-Fi event: STA_LOST_IP, status=%d\n", status);
 				break;
 			case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
-				Serial.printf(
+				consolelog::printf(
 				    "Wi-Fi event: STA_DISCONNECTED, reason=%u (%s), status=%d\n", record.reason,
 				    WiFi.disconnectReasonName(static_cast<wifi_err_reason_t>(record.reason)),
 				    status);
@@ -165,42 +165,42 @@ void logWifiEvents()
 	}
 }
 
-void printWifiScanResult(int16_t count)
+void printWifiScanResult(int16_t count, const String &configuredSsid)
 {
 	const int shown = count < WIFI_SCAN_MAX_PRINTED ? count : WIFI_SCAN_MAX_PRINTED;
 	int configuredMatches = 0;
 
-	Serial.printf("--- Wi-Fi scan: %d network(s) found ---\n", count);
+	consolelog::printf("--- Wi-Fi scan: %d network(s) found ---\n", count);
 
 	for (int i = 0; i < count; ++i) {
 		const String ssid = WiFi.SSID(i);
-		const bool isConfigured = ssid == secrets::WIFI_SSID;
+		const bool isConfigured = ssid == configuredSsid;
 		if (isConfigured) {
 			++configuredMatches;
 		}
 
 		if (i < shown) {
-			Serial.printf("  [%d] SSID \"%s\" ch=%d rssi=%d dBm auth=%s%s\n", i,
-			              ssid.length() != 0 ? ssid.c_str() : "<hidden>",
-			              static_cast<int>(WiFi.channel(i)), static_cast<int>(WiFi.RSSI(i)),
-			              authModeName(WiFi.encryptionType(i)),
-			              isConfigured ? "  <-- configured SSID" : "");
+			consolelog::printf("  [%d] SSID \"%s\" ch=%d rssi=%d dBm auth=%s%s\n", i,
+			                   ssid.length() != 0 ? ssid.c_str() : "<hidden>",
+			                   static_cast<int>(WiFi.channel(i)), static_cast<int>(WiFi.RSSI(i)),
+			                   authModeName(WiFi.encryptionType(i)),
+			                   isConfigured ? "  <-- configured SSID" : "");
 		}
 	}
 
 	if (count > shown) {
-		Serial.printf("  ... %d more not listed\n", count - shown);
+		consolelog::printf("  ... %d more not listed\n", count - shown);
 	}
 
 	if (configuredMatches > 0) {
-		Serial.printf("Configured SSID: FOUND (%d AP(s))\n", configuredMatches);
+		consolelog::printf("Configured SSID: FOUND (%d AP(s))\n", configuredMatches);
 	} else {
-		Serial.println("Configured SSID: NOT FOUND");
+		consolelog::println("Configured SSID: NOT FOUND");
 	}
 }
 
 // Non-blocking: starts an asynchronous scan and polls it on later calls.
-void serviceWifiScan()
+void serviceWifiScan(const String &configuredSsid)
 {
 	if (s_wifiScanRunning) {
 		const int16_t result = WiFi.scanComplete();
@@ -210,9 +210,9 @@ void serviceWifiScan()
 
 		s_wifiScanRunning = false;
 		if (result < 0) {
-			Serial.printf("Wi-Fi scan failed (code %d)\n", static_cast<int>(result));
+			consolelog::printf("Wi-Fi scan failed (code %d)\n", static_cast<int>(result));
 		} else {
-			printWifiScanResult(result);
+			printWifiScanResult(result, configuredSsid);
 		}
 		WiFi.scanDelete();
 		return;
@@ -239,9 +239,9 @@ void serviceWifiScan()
 	const int16_t result = WiFi.scanNetworks(true, true);
 	if (result == WIFI_SCAN_RUNNING) {
 		s_wifiScanRunning = true;
-		Serial.println("Wi-Fi scan started (after NO_AP_FOUND/AUTH_EXPIRE/AUTH_FAIL)");
+		consolelog::println("Wi-Fi scan started (after NO_AP_FOUND/AUTH_EXPIRE/AUTH_FAIL)");
 	} else {
-		Serial.printf("Wi-Fi scan could not start (code %d)\n", static_cast<int>(result));
+		consolelog::printf("Wi-Fi scan could not start (code %d)\n", static_cast<int>(result));
 	}
 }
 
@@ -267,15 +267,16 @@ const char *toString(PublishResult result)
 	return "unknown";
 }
 
-TelemetryPublisher::TelemetryPublisher(WiFiClient &wifiClient, const char *deviceId)
-    : m_mqttClient(wifiClient), m_deviceId(deviceId),
-      m_topic(String("v1/devices/") + deviceId + "/telemetry")
-{
-}
+TelemetryPublisher::TelemetryPublisher(WiFiClient &wifiClient) : m_mqttClient(wifiClient) {}
 
-void TelemetryPublisher::begin()
+void TelemetryPublisher::begin(const deviceconfig::WifiSettings &wifi,
+                               const deviceconfig::MqttSettings &mqtt, const String &deviceId)
 {
-	m_mqttClient.setServer(secrets::MQTT_HOST, secrets::MQTT_PORT);
+	m_wifiSettings = wifi;
+	m_mqttSettings = mqtt;
+	m_deviceId = deviceId;
+	m_topic = String("v1/devices/") + m_deviceId + "/telemetry";
+	m_mqttClient.setServer(m_mqttSettings.host.c_str(), m_mqttSettings.port);
 	m_mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
 
 	if (!s_wifiEventHandlerRegistered) {
@@ -284,16 +285,54 @@ void TelemetryPublisher::begin()
 	}
 
 	WiFi.mode(WIFI_STA);
-	WiFi.begin(secrets::WIFI_SSID, secrets::WIFI_PASSWORD);
+	WiFi.begin(m_wifiSettings.ssid.c_str(), m_wifiSettings.password.c_str());
 	m_lastWifiAttemptMs = millis();
 
-	Serial.printf("MQTT topic: %s\n", m_topic.c_str());
+	consolelog::printf("MQTT topic: %s\n", m_topic.c_str());
+}
+
+void TelemetryPublisher::applyWifiSettings(const deviceconfig::WifiSettings &wifi)
+{
+	if (m_mqttClient.connected()) {
+		consolelog::println("Wi-Fi settings changed, disconnecting from MQTT broker");
+		m_mqttClient.disconnect();
+	}
+
+	m_wifiSettings = wifi;
+	consolelog::printf("Wi-Fi settings changed, connecting to SSID \"%s\"\n",
+	                   m_wifiSettings.ssid.c_str());
+	WiFi.disconnect();
+	WiFi.begin(m_wifiSettings.ssid.c_str(), m_wifiSettings.password.c_str());
+	m_lastWifiAttemptMs = millis();
+	m_lastMqttAttemptMs = 0;
+}
+
+void TelemetryPublisher::applyMqttSettings(const deviceconfig::MqttSettings &mqtt,
+                                           const String &deviceId)
+{
+	if (m_mqttClient.connected()) {
+		consolelog::println("MQTT settings changed, disconnecting from current broker");
+		m_mqttClient.disconnect();
+	}
+
+	m_mqttSettings = mqtt;
+	m_deviceId = deviceId;
+	m_topic = String("v1/devices/") + m_deviceId + "/telemetry";
+	m_mqttClient.setServer(m_mqttSettings.host.c_str(), m_mqttSettings.port);
+	m_lastMqttAttemptMs = 0;
+
+	consolelog::printf("MQTT topic: %s\n", m_topic.c_str());
+}
+
+const String &TelemetryPublisher::topic() const
+{
+	return m_topic;
 }
 
 void TelemetryPublisher::loop()
 {
 	logWifiEvents();
-	serviceWifiScan();
+	serviceWifiScan(m_wifiSettings.ssid);
 	ensureWifi();
 
 	if (WiFi.status() != WL_CONNECTED) {
@@ -317,7 +356,7 @@ int TelemetryPublisher::mqttState()
 	return m_mqttClient.state();
 }
 
-PublishResult TelemetryPublisher::publish(const Reading &reading)
+PublishResult TelemetryPublisher::publish(const Reading &reading, bool logPublished)
 {
 	if (!reading.batterySocOk || !reading.batteryPowerOk) {
 		return PublishResult::IncompleteReading;
@@ -367,7 +406,7 @@ PublishResult TelemetryPublisher::publish(const Reading &reading)
 	const size_t length = serializeJson(document, payload, sizeof(payload));
 
 	if (length == 0 || length >= sizeof(payload) || document.overflowed()) {
-		Serial.println("Telemetry payload serialization failed");
+		consolelog::println("Telemetry payload serialization failed");
 		return PublishResult::PublishFailed;
 	}
 
@@ -376,7 +415,10 @@ PublishResult TelemetryPublisher::publish(const Reading &reading)
 		return PublishResult::PublishFailed;
 	}
 
-	Serial.printf("Published seq=%lu: %s\n", static_cast<unsigned long>(m_sequence), payload);
+	if (logPublished) {
+		consolelog::printf("Published seq=%lu: %s\n", static_cast<unsigned long>(m_sequence),
+		                   payload);
+	}
 
 	return PublishResult::Published;
 }
@@ -386,16 +428,16 @@ void TelemetryPublisher::ensureWifi()
 	if (WiFi.status() == WL_CONNECTED) {
 		if (!m_wifiWasConnected) {
 			m_wifiWasConnected = true;
-			Serial.printf("Wi-Fi connected, status=%d, IP %s, RSSI %d dBm\n",
-			              static_cast<int>(WiFi.status()), WiFi.localIP().toString().c_str(),
-			              WiFi.RSSI());
+			consolelog::printf("Wi-Fi connected, status=%d, IP %s, RSSI %d dBm\n",
+			                   static_cast<int>(WiFi.status()),
+			                   WiFi.localIP().toString().c_str(), WiFi.RSSI());
 		}
 		return;
 	}
 
 	if (m_wifiWasConnected) {
 		m_wifiWasConnected = false;
-		Serial.printf("Wi-Fi connection lost, status=%d\n", static_cast<int>(WiFi.status()));
+		consolelog::printf("Wi-Fi connection lost, status=%d\n", static_cast<int>(WiFi.status()));
 	}
 
 	const uint32_t now = millis();
@@ -405,9 +447,10 @@ void TelemetryPublisher::ensureWifi()
 	}
 
 	m_lastWifiAttemptMs = now;
-	Serial.printf("Wi-Fi not connected, retrying, status=%d\n", static_cast<int>(WiFi.status()));
+	consolelog::printf("Wi-Fi not connected, retrying, status=%d\n",
+	                   static_cast<int>(WiFi.status()));
 	WiFi.disconnect();
-	WiFi.begin(secrets::WIFI_SSID, secrets::WIFI_PASSWORD);
+	WiFi.begin(m_wifiSettings.ssid.c_str(), m_wifiSettings.password.c_str());
 }
 
 void TelemetryPublisher::ensureMqtt()
@@ -424,17 +467,20 @@ void TelemetryPublisher::ensureMqtt()
 
 	m_lastMqttAttemptMs = now;
 
-	Serial.printf("Connecting to MQTT broker as \"%s\"\n", m_deviceId);
+	consolelog::printf("Connecting to MQTT broker %s:%u as \"%s\" (%s)\n",
+	                   m_mqttSettings.host.c_str(), m_mqttSettings.port, m_deviceId.c_str(),
+	                   m_mqttSettings.username.isEmpty() ? "anonymous" : "with credentials");
 
 	const bool connected =
-	    secrets::MQTT_USERNAME[0] != '\0'
-	        ? m_mqttClient.connect(m_deviceId, secrets::MQTT_USERNAME, secrets::MQTT_PASSWORD)
-	        : m_mqttClient.connect(m_deviceId);
+	    !m_mqttSettings.username.isEmpty()
+	        ? m_mqttClient.connect(m_deviceId.c_str(), m_mqttSettings.username.c_str(),
+	                               m_mqttSettings.password.c_str())
+	        : m_mqttClient.connect(m_deviceId.c_str());
 
 	if (connected) {
-		Serial.println("MQTT connected");
+		consolelog::println("MQTT connected");
 	} else {
-		Serial.printf("MQTT connect failed, state=%d\n", m_mqttClient.state());
+		consolelog::printf("MQTT connect failed, state=%d\n", m_mqttClient.state());
 	}
 }
 

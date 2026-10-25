@@ -31,6 +31,9 @@ PlatformIO uses the generic `esp32-s3-devkitc-1` board definition. Hardware-spec
 | `src/ModbusClient.*` | Modbus RTU master, function `0x03` only |
 | `src/TimeSync.*` | SNTP setup and UTC timestamp formatting |
 | `src/TelemetryPublisher.*` | Wi-Fi/MQTT connection handling and JSON publishing |
+| `src/DeviceConfig.*` | Runtime configuration: keys, validation, NVS storage |
+| `src/SerialConsole.*` | Serial `help` / `status` / `telemetry` / `config ...` commands, echo and line editing |
+| `src/ConsoleLog.*` | Background Serial output, held back while a command is typed |
 | `src/main.cpp` | Poll loop and diagnostic scan |
 
 ## Configuration
@@ -46,7 +49,9 @@ Edit `secrets.h` and set:
 - `WIFI_SSID`, `WIFI_PASSWORD`;
 - `MQTT_HOST`, `MQTT_PORT` (default `1883`, matching `docker/mosquitto/config/mosquitto.conf`);
 - `MQTT_USERNAME`, `MQTT_PASSWORD` (leave empty for anonymous access);
-- `DEVICE_ID` — used in the topic and as the MQTT client id. It must not contain `/`, `+`, or `#`.
+- `DEVICE_ID` — used in the topic and as the MQTT client id (letters, digits, `.`, `-`, `_`).
+
+All `secrets.h` values, together with `MODBUS_SLAVE_ID` and `MODBUS_BAUD` from `Config.h`, are defaults. A configuration saved on the device (see [Serial Console Configuration](#serial-console-configuration)) takes precedence over them.
 
 `secrets.h` is listed in `.gitignore`. Never commit it. The build fails if it is missing.
 
@@ -61,6 +66,156 @@ Other settings are in `include/Config.h`:
 | `WIFI_CONNECT_TIMEOUT_MS` | `15000` | Time before a Wi-Fi attempt is restarted |
 | `MQTT_RETRY_INTERVAL_MS` | `5000` | Minimum gap between MQTT connect attempts |
 | `NTP_SERVER_PRIMARY` / `_SECONDARY` | `pool.ntp.org` / `time.google.com` | SNTP servers |
+
+## Serial Console Configuration
+
+Wi-Fi, MQTT, device id, and Modbus settings can be viewed and changed in the Serial Monitor without reflashing. Type `help` for the full command list, keys, and examples.
+
+### Storage
+
+- The configuration is stored with the Arduino `Preferences` library in the NVS partition of the flash (namespace `hpg-config`, key `cfg`) as one record, so all values are replaced together.
+- At boot the firmware loads the record. If none exists, the defaults from `secrets.h` and `Config.h` are used. The boot log shows the source, without passwords:
+
+  ```text
+  Device id: deye-esp32-001
+  Configuration: NVS (load status: stored)
+  Wi-Fi SSID "HomeNet"; MQTT broker 192.168.1.20:1883, with credentials; Modbus slave 1, 9600 baud
+  ```
+
+  `load status` is `stored`, `not_stored` (defaults used), `stored_invalid` (record unreadable or invalid; defaults used, record left untouched), or `nvs_error` (NVS could not be opened; defaults used).
+- A normal firmware upload does not erase NVS, so the saved configuration survives reflashing. Erasing the whole flash (`pio run -t erase`) removes it.
+- **NVS does not encrypt data.** The Wi-Fi and MQTT passwords are stored in plain form; anyone with physical access to the board can read them from the flash. NVS encryption and flash encryption are not enabled in this firmware.
+
+### Commands
+
+One command per line, words separated by exactly one space. Changes go to a *draft* and take effect only after `config save`.
+
+| Command | Effect |
+|---|---|
+| `help` | Full list of commands and keys with allowed values, value rule, examples |
+| `status` | Wi-Fi, MQTT, Modbus, and time-sync state, the Serial telemetry mode, and the latest measurements |
+| `telemetry on` / `telemetry off` | Start or stop printing the periodic telemetry blocks to Serial (default: off) |
+| `config show` | Active configuration and its source (passwords masked), then unsaved changes |
+| `config status` | Same as `status` |
+| `config set <key> <value>` | Change one value in the draft |
+| `config clear <key>` | Empty a value in the draft (only `wifi.password`, `mqtt.user`, `mqtt.password`) |
+| `config save` | Validate the whole draft, write it to NVS, read it back, and apply the changed parts |
+| `config discard` | Drop the draft |
+| `config reset` | Ask to restore the defaults; `config reset confirm` within 30 s performs it |
+
+### Keys and Allowed Values
+
+| Key | Allowed values | Default |
+|---|---|---|
+| `wifi.ssid` | 1–32 printable ASCII characters | `WIFI_SSID` |
+| `wifi.password` | 8–63 printable ASCII characters; empty = open network | `WIFI_PASSWORD` |
+| `mqtt.host` | Host name or IPv4 address, 1–64 characters: letters, digits, `.`, `-`, `_` | `MQTT_HOST` |
+| `mqtt.port` | 1–65535 | `MQTT_PORT` |
+| `mqtt.user` | 0–64 printable ASCII characters; empty = anonymous; required if `mqtt.password` is set | `MQTT_USERNAME` |
+| `mqtt.password` | 0–64 printable ASCII characters | `MQTT_PASSWORD` |
+| `device.id` | 1–64 characters: letters, digits, `.`, `-`, `_` | `DEVICE_ID` |
+| `modbus.slave_id` | 1–247 | `MODBUS_SLAVE_ID` (`1`) |
+| `modbus.baud` | 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200 (always 8-N-1) | `MODBUS_BAUD` (`9600`) |
+
+Parsing rules:
+
+- `<value>` is everything after `config set <key> ` up to the end of the line, taken literally. Spaces inside a value (SSID, passwords, username) are kept; leading or trailing spaces are rejected, so `config set wifi.ssid  Home` (two spaces) is an error, not `" Home"`.
+- An empty value is never accepted by `config set`; use `config clear <key>`.
+- Numbers are plain decimal digits.
+- Lines longer than 160 characters or containing non-ASCII or control characters are rejected as a whole. Backspace is supported.
+- Each value is checked when it is set; an invalid value is rejected and the draft is not changed. Rules that involve two keys (`mqtt.user` required for `mqtt.password`) are reported as a note and checked again by `config save`.
+
+### First Setup
+
+Example (values are placeholders):
+
+```text
+help
+config set wifi.ssid My Home WiFi
+config set wifi.password <wifi-password>
+config set mqtt.host 192.168.1.20
+config set mqtt.port 1883
+config set mqtt.user hpg-device
+config set mqtt.password <mqtt-password>
+config show
+config save
+config status
+```
+
+Each `config set` is confirmed, e.g. `Draft: mqtt.host = 192.168.1.20` or `Draft: mqtt.password = <set>`. `config show` lists the draft as `key  old -> new`; for passwords only `<set>`/`<empty>` and `(changed)` are shown.
+
+### Changing and Saving
+
+Set only the values to change and run `config save`. Other values keep their active values. `config save`:
+
+1. validates the whole draft; on error it prints `Save failed: <key> <reason>` and neither stores nor applies anything;
+2. writes the record to NVS and reads it back;
+3. applies only the groups that changed:
+   - Wi-Fi: closes the MQTT session, disconnects Wi-Fi, and connects to the new network (`Wi-Fi settings changed, connecting to SSID "..."`);
+   - MQTT or device id: closes the MQTT session (`MQTT settings changed, disconnecting from current broker`), prints the new topic, and connects immediately with the new broker, credentials, and client id;
+   - Modbus: the new slave id and baud rate are used from the next request.
+
+Changing `device.id` changes the MQTT topic `v1/devices/<device.id>/telemetry`; the backend then stores the data under the new id.
+
+### Discard and Reset
+
+- `config discard` drops the draft. The active and stored configuration are not touched.
+- `config reset` prints what will happen and must be confirmed with `config reset confirm` within 30 s; any other command cancels it. The reset removes the stored record, restores the defaults from `secrets.h` and `Config.h`, discards the draft, and applies the changed groups as above. Rebuilding with new `secrets.h` values has no effect while a record is stored; run `config reset` first.
+
+### Errors
+
+- Validation errors: `Error: <key> <reason>. Draft not changed.` or, on save, `Save failed: <key> <reason>`.
+- NVS errors on save (`NVS open failed`, `NVS write failed`, `NVS read-back verification failed`): the active configuration is not changed and the draft is kept. If NVS could not be opened or written, the previously stored record also stays unchanged.
+- NVS error on reset: `Reset failed: <reason>`; nothing changes.
+- Unknown commands, unknown keys, and malformed lines are reported without repeating the input.
+
+### Diagnostics
+
+`config status` example:
+
+```text
+Wi-Fi:  connected to "HomeNet", IP 192.168.1.50, RSSI -61 dBm
+MQTT:   connected to 192.168.1.20:1883 as "deye-esp32-001" (with credentials)
+        topic v1/devices/deye-esp32-001/telemetry
+Modbus: slave 1, 9600 baud, 8-N-1
+        last valid response 1830 ms ago, last request: ok
+        valid responses 412, failed requests 3
+Time:   synchronized (NTP)
+Config: source NVS (load status: stored), unsaved changes: no
+```
+
+- Wi-Fi `status` codes are the `WiFi.status()` values listed in [Serial Monitor](#serial-monitor).
+- MQTT `state` is PubSubClient `state()` (0 = connected, negative = disconnected or connection failed, positive = refused by the broker, e.g. 4 = bad credentials, 5 = not authorized).
+- Modbus counts every request since boot (telemetry and diagnostic scan). A Modbus exception reply counts as a valid response because the inverter answered.
+
+### Safe Password Entry
+
+- The firmware echoes what you type, but shows the characters of a password value as `*` (for `config set <key> <value>` the value is masked unless `<key>` is a known non-secret key, so a mistyped key is masked too). It never prints passwords. `config show`, `status`, and `config status` show passwords only as `<set>`/`<empty>`. If the command word itself is mistyped (for example `confg set ...`), the line is echoed as typed, so type the command word carefully before the password.
+- `pio device monitor` does not echo locally by default, so the characters you see come from the device. Do not add `--echo` or logging filters such as `log2file` while entering a password: they show or store the typed text on the computer.
+- Close the monitor (or clear its scrollback) after configuration when other people can access the computer.
+- The USB serial port has no authentication: anyone with physical USB access can read the non-secret configuration and change all settings.
+
+### Commands and the Poll Loop
+
+Serial input is read without waiting. Typed characters are echoed immediately, even while a Modbus request is in progress. A command is executed when the line is complete and the firmware is back in its main loop, i.e. after the current telemetry cycle (normally well under a second, a few seconds if the inverter does not answer). A command never interrupts a Modbus request, and a saved configuration is applied between requests. MQTT publishing, Modbus polling, time sync, and Wi-Fi/MQTT reconnection run the same way whether or not the Serial telemetry output is on.
+
+### Typing in the Serial Monitor
+
+- The device echoes typed characters. Enter may be CR, LF, or CRLF; one Enter runs exactly one command. Backspace and Delete erase the last character. Lines are limited to 160 printable ASCII characters; longer or non-ASCII lines are rejected as a whole.
+- While you type a line, other messages (Wi-Fi events, MQTT reconnect attempts, error summaries) are held back in a 1.5 KB buffer and printed after Enter, so they do not split the line. If you stop typing for 10 s, they are printed on a new line and your text is shown again when you continue. If more than the buffer holds arrives, the rest is dropped and `[N message(s) dropped while typing]` is printed.
+- Commands pasted in bulk work as long as each line is at most 160 characters; the receive buffer is 1 KB.
+
+### Settings That Require Reflashing
+
+| Setting | Location | Reason |
+|---|---|---|
+| RS485 pins (`RS485_TX_PIN`, `RS485_RX_PIN`, `RS485_DE_PIN`) | `Config.h` | Board wiring; not a runtime setting |
+| Modbus frame format 8-N-1, `MODBUS_RESPONSE_TIMEOUT_MS`, `MODBUS_INTER_FRAME_DELAY_MS` | `Config.h`, `ModbusClient` | Fixed protocol timing |
+| `TELEMETRY_INTERVAL_MS`, `DIAGNOSTIC_INTERVAL_MS`, `DIAGNOSTIC_MODE_ENABLED` | `Config.h` | Compile-time constants |
+| `WIFI_CONNECT_TIMEOUT_MS`, `MQTT_RETRY_INTERVAL_MS` | `Config.h` | Compile-time constants |
+| NTP servers | `Config.h` | Compile-time constants |
+| Register addresses and publication gates | `RegisterMap.h` | Require hardware verification |
+| MQTT topic format, QoS, TLS (not supported) | `TelemetryPublisher` | Protocol contract with the backend |
 
 ## Build
 
@@ -106,7 +261,11 @@ pio device monitor --port /dev/ttyACM0 --baud 115200
 
 Exit with `Ctrl+C`.
 
-Every telemetry cycle prints the verified readings and the publish result. Example:
+By default the periodic telemetry blocks are **not** printed, so the console stays usable for typing. Type `telemetry on` to print them and `telemetry off` to stop; `status` shows the state and the latest measurements at any time. This only affects Serial output: Modbus polling and MQTT publishing continue unchanged, and `telemetry on` does not start an extra read or publish.
+
+With `telemetry off`, errors stay visible but are not repeated every cycle: Modbus read errors are printed when they start (`Modbus read errors started: ...`) and when they end (`Modbus reads recovered`); `Telemetry not published: ...` is printed when its reason changes, and `Telemetry publishing resumed` when publishing works again. Wi-Fi/MQTT connection messages and configuration warnings are always printed.
+
+With `telemetry on`, every telemetry cycle prints the verified readings and the publish result. Example:
 
 ```text
 --- Deye telemetry ---
@@ -140,7 +299,7 @@ After a disconnect with `reason=201 (NO_AP_FOUND)`, `2 (AUTH_EXPIRE)` or `202 (A
 
 ### Diagnostic Mode
 
-With `DIAGNOSTIC_MODE_ENABLED = true`, the firmware scans the candidate registers every 15 s. Each register is read individually; a failure does not stop the scan. Example:
+With `DIAGNOSTIC_MODE_ENABLED = true` and `telemetry on`, the firmware scans the candidate registers every 15 s. With `telemetry off` the scan does not run (it only prints diagnostics), and after `telemetry on` the first scan comes 15 s later. Each register is read individually; a failure does not stop the scan. Example:
 
 ```text
 --- Candidate register scan (UNVERIFIED, not published) ---
@@ -233,6 +392,7 @@ The firmware starts SNTP in UTC at boot. Until the clock reports a time after 20
 - MQTT: one connection attempt at most every `MQTT_RETRY_INTERVAL_MS`, only while Wi-Fi is connected.
 - Modbus polling continues regardless of network state, so serial diagnostics remain available offline.
 - Readings taken while disconnected are not buffered.
+- After `config save` or `config reset` changes Wi-Fi, MQTT, or device id settings, an open MQTT session is closed and Wi-Fi/MQTT reconnect immediately with the new settings.
 
 ## Verified Hardware Test
 
@@ -273,6 +433,7 @@ Do not assume the previous port name is still valid. Missing serial output does 
 - The sign convention for `grid_power_w` is not yet defined by the backend.
 - `battery_power_w` is published with `+` = discharge, `−` = charge. The sign has only been observed while charging; the discharge sign still requires hardware verification.
 - MQTT uses plain TCP without TLS, matching the bundled Mosquitto configuration.
+- The configuration stored in NVS, including the Wi-Fi and MQTT passwords, is not encrypted.
 - Readings are not buffered while offline.
 - Relay control and inverter-setting writes are not implemented.
 
@@ -280,8 +441,8 @@ Before adding relay control, verify the relay GPIO and active level against the 
 
 ## Safety Checklist Before Flashing
 
-1. `include/secrets.h` contains the intended network and broker, and is not staged in Git (`git status` must not list it).
+1. `include/secrets.h` contains the intended network and broker, and is not staged in Git (`git status` must not list it). A configuration stored in NVS overrides `secrets.h`; check it with `config show` after flashing.
 2. `include/RegisterMap.h` gates match the intended state. They are currently `true` for unconfirmed registers (see Beta Limitations); `REGISTER_MAP.md` must say so.
 3. The build succeeds without warnings in `src/`.
 4. The firmware sends only function `0x03` requests (no write function codes exist in `ModbusClient`).
-5. After flashing, the serial monitor shows valid verified readings before the board is left unattended.
+5. After flashing, `status` (or `telemetry on`) in the serial monitor shows valid verified readings before the board is left unattended.
