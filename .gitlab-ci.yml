@@ -49,7 +49,6 @@ test:
     - until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do sleep 1; done
     - ctest --test-dir build --output-on-failure
 
-
 publish_image:
   stage: image
   image: docker:cli
@@ -58,11 +57,12 @@ publish_image:
     BUILDX_NO_DEFAULT_ATTESTATIONS: "1"
 
   script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
-    - printf '[registry."%s"]\n  http = true\n  insecure = true\n' "$CI_REGISTRY" > buildkitd.toml
-    - docker buildx create --name ci-builder --driver docker-container --driver-opt network=host --buildkitd-config buildkitd.toml --use
+    - apk add --no-cache skopeo
+    - docker buildx create --name ci-builder --driver docker-container --use
     - docker buildx inspect --bootstrap
-    - docker buildx build --platform linux/amd64,linux/arm64 --target runtime --tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" --tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" --push .
+    - docker buildx build --platform linux/amd64,linux/arm64 --target runtime --tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" --output type=oci,dest=multiarch-image.tar .
+    - skopeo copy --all --dest-tls-verify=false --dest-creds "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" oci-archive:multiarch-image.tar "docker://$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+    - skopeo copy --all --dest-tls-verify=false --dest-creds "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" oci-archive:multiarch-image.tar "docker://$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
 
   rules:
     - if: '$CI_COMMIT_TAG'
