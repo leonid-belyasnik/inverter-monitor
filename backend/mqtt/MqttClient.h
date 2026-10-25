@@ -30,6 +30,10 @@ class MqttClient
 	MqttClient(const MqttClient &) = delete;
 	MqttClient &operator=(const MqttClient &) = delete;
 
+	// Must be called before connect(). An empty password is sent as "no password".
+	// The credentials are never logged or included in errorMessage().
+	bool setCredentials(const std::string &username, const std::string &password);
+
 	bool connect();
 	bool subscribe(std::string topic, int qos = 1);
 

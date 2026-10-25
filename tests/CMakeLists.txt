@@ -93,6 +93,21 @@ add_test(
     COMMAND telemetry_adapter_test
 )
 
+add_executable(mqtt_client_test
+    MqttClientTest.cpp
+)
+
+target_link_libraries(mqtt_client_test
+    PRIVATE
+        mqtt
+        GTest::gtest_main
+)
+
+add_test(
+    NAME MqttClientTest
+    COMMAND mqtt_client_test
+)
+
 add_executable(http_router_test
     HttpRouterTest.cpp
 )

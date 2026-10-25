@@ -269,6 +269,16 @@ int main()
 
 	const int mqttPort = getEnvironmentInt("MQTT_PORT", 1883);
 
+	// Empty values are treated as unset, so Compose-style `VAR=` keeps anonymous access.
+	const std::string mqttUsername = getEnvironment("MQTT_USERNAME", "");
+	const std::string mqttPassword = getEnvironment("MQTT_PASSWORD", "");
+	const bool mqttAuthEnabled = !mqttUsername.empty();
+
+	if (!mqttAuthEnabled && !mqttPassword.empty()) {
+		logMessage(LogLevel::Error, "MQTT_PASSWORD is set but MQTT_USERNAME is not");
+		return 1;
+	}
+
 	const auto databaseConnection = connectDatabase(database::StartupRetryPolicy{});
 
 	if (!databaseConnection) {
@@ -352,6 +362,8 @@ int main()
 
 	logMessage(LogLevel::Info, "Starting inverter-monitor");
 	logMessage(LogLevel::Info, "MQTT broker: " + mqttHost + ':' + std::to_string(mqttPort));
+	logMessage(LogLevel::Info,
+	           std::string("MQTT authentication: ") + (mqttAuthEnabled ? "enabled" : "disabled"));
 
 	mqtt::MqttClient mqtt(
 	    "inverter-monitor-backend", mqttHost, mqttPort,
@@ -385,6 +397,13 @@ int main()
 			                   describeIngestionError(error));
 		    }
 	    });
+
+	if (mqttAuthEnabled && !mqtt.setCredentials(mqttUsername, mqttPassword)) {
+		logMessage(LogLevel::Error, "MQTT authentication setup failed: " + mqtt.errorMessage());
+		stopServers();
+
+		return 1;
+	}
 
 	if (!mqtt.connect()) {
 		logMessage(LogLevel::Error, "MQTT connection failed: " + mqtt.errorMessage());

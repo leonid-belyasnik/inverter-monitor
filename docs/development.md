@@ -44,6 +44,10 @@ The MQTT client uses these environment variables:
 
 * `MQTT_HOST` — broker hostname; defaults to `localhost`.
 * `MQTT_PORT` — broker port; defaults to `1883`.
+* `MQTT_USERNAME` — optional broker username. If unset or empty, the backend connects without authentication.
+* `MQTT_PASSWORD` — optional broker password; requires `MQTT_USERNAME`. If the password is set without a username, the backend refuses to start.
+
+The credentials are sent over plain MQTT unless the broker connection is protected separately; the backend does not configure TLS. The username and password are never written to the logs.
 
 Database connection settings are configured through the project's existing database configuration and environment.
 

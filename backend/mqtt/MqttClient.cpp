@@ -48,6 +48,23 @@ MqttClient::~MqttClient()
 	mosquitto_lib_cleanup();
 }
 
+bool MqttClient::setCredentials(const std::string &username, const std::string &password)
+{
+	if (!m_client) {
+		return false;
+	}
+
+	const int result = mosquitto_username_pw_set(m_client, username.c_str(),
+	                                             password.empty() ? nullptr : password.c_str());
+
+	if (result != MOSQ_ERR_SUCCESS) {
+		m_errorMessage = mosquitto_strerror(result);
+		return false;
+	}
+
+	return true;
+}
+
 bool MqttClient::connect()
 {
 	if (!m_client) {
