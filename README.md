@@ -1,7 +1,6 @@
 # Inverter Monitor
 
-Inverter Monitor is an independent project by Leonid Belyasnik and is part of
-the HomePowerGuard project.
+Inverter Monitor is part of the HomePowerGuard project.
 
 Copyright (c) 2026 Leonid Belyasnik.
 
