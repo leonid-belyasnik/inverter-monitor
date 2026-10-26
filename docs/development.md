@@ -49,7 +49,7 @@ The MQTT client uses these environment variables:
 
 The credentials are sent over plain MQTT unless the broker connection is protected separately; the backend does not configure TLS. The username and password are never written to the logs.
 
-Database connection settings are configured through the project's existing database configuration and environment.
+Database connection settings are read from the standard libpq `PG*` environment variables. See [Configuration](configuration.md) for all variables and defaults, and [Deployment](deployment.md) for running the stack on a server.
 
 ## Tests
 
