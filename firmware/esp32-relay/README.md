@@ -340,6 +340,8 @@ The firmware uses Modbus RTU function `0x03` (Read Holding Registers) only.
 
 PV (186 + 187), grid (169), and load (178) power registers are **unconfirmed** and published temporarily. See [REGISTER_MAP.md](REGISTER_MAP.md) for candidates, sources, and the verification procedure.
 
+For Deye's own protocol description (register map, port parameters, alarm and fault codes) see the translated [Deye single-phase Modbus reference](../../docs/references/deye-single-phase-modbus.md). It is a secondary reference, not a record of hardware verification, and covers much more than this firmware uses: it also describes write function `0x10` and EMS control registers, which the firmware does not implement.
+
 Registers are read individually. Each response is checked for slave address, function code, byte count, length, and CRC. Modbus exception replies (function `0x83`) are reported with their exception code. A failed read is reported as failed for that cycle; the firmware never reuses a previous value.
 
 `Grid relay: ON` represents the inverter's grid-relay status. It does not independently guarantee that usable grid voltage is present, and `OFF` does not by itself prove that the external grid has no voltage (the inverter may keep the relay open, for example, while the voltage is out of range).
