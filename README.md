@@ -1,4 +1,5 @@
 # Inverter Monitor
+[![CI](https://github.com/leonid-belyasnik/inverter-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/leonid-belyasnik/inverter-monitor/actions/workflows/ci.yml)
 
 Inverter Monitor is part of the HomePowerGuard project.
 
