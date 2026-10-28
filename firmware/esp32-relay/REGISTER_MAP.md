@@ -4,6 +4,8 @@ The firmware definitions live in [`include/RegisterMap.h`](include/RegisterMap.h
 
 Deye does not publish a complete, model-specific register map for the SG05LP1. Public community tables are written for the related single-phase LP1 family (Sunsynk/Deye 5–8 kW) and do not always agree. Treat every register that is not marked **verified** as a hypothesis.
 
+A translated copy of Deye's single-phase Modbus RTU protocol document (full register map, protocol parameters, alarm and fault codes) is available as the [Deye single-phase Modbus reference](../../docs/references/deye-single-phase-modbus.md). It describes the protocol family and does not name the SG05LP1 model. Its entries are manufacturer statements, not verification on this inverter: a register is verified only when it is listed as **verified** below. The reference also lists registers, such as `178` and `179`, that it describes differently from the candidate tables here; its section 8 compares them with this firmware.
+
 All registers are read with Modbus function `0x03` (Read Holding Registers), slave `1`, one register per request.
 
 ## Verified Registers

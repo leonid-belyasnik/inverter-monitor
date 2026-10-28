@@ -48,6 +48,7 @@ clients. For ports, protocols and the deployment boundary, see the
 * [Configuration](docs/configuration.md) – environment variables, ports, secrets
 * [UI documentation](docs/ui/beta-scope.md) – beta scope, [interface spec](docs/ui/interface-spec.md), [telemetry and freshness](docs/ui/telemetry-and-freshness.md), [local development](docs/ui/local-development.md)
 * [ESP32 firmware](firmware/esp32-relay/README.md)
+* [Deye Modbus reference](docs/references/deye-single-phase-modbus.md) – translated vendor register map, protocol parameters and alarm/fault codes (secondary reference, not hardware-verified)
 
 ## Quick start (development)
 
