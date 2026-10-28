@@ -1,5 +1,76 @@
 # Architecture
 
+## System Architecture
+
+> **Status: beta.** The diagram shows what the code and configuration in this repository do today. It does not describe a hardened or production-ready system: the UI, REST API and WebSocket have no authentication or TLS, and the repository has no production Compose file.
+
+```mermaid
+flowchart TB
+    subgraph producers["Telemetry producers"]
+        esp["ESP32 firmware<br/>reads the Deye inverter<br/>over Modbus RTU / RS485"]
+        sim["Telemetry simulator"]
+    end
+
+    broker["MQTT broker :1883"]
+
+    subgraph compose["Docker Compose project (deployment guide)"]
+        subgraph backend["inverter-monitor backend (C++)"]
+            ingest["MQTT subscriber, parser,<br/>TelemetryIngestionService"]
+            rest["REST server :8080"]
+            ws["WebSocket server :8081"]
+        end
+        db[("PostgreSQL :5432")]
+        nginx["ui container: nginx :80"]
+    end
+
+    browser["Browser: React UI"]
+
+    esp ==>|"MQTT publish v1/devices/{deviceId}/telemetry"| broker
+    sim ==>|"MQTT publish, same topic pattern"| broker
+    broker ==>|"MQTT subscribe v1/devices/+/telemetry"| ingest
+    ingest ==>|"1. SQL INSERT"| db
+    ingest ==>|"2. in-process publish, only after 1 succeeded"| ws
+
+    rest <-->|"SQL SELECT"| db
+    nginx <-->|"HTTP /api/"| rest
+    nginx <-->|"WebSocket /ws"| ws
+    browser <-->|"HTTP and WebSocket"| nginx
+```
+
+How to read it:
+
+* Thick arrows are the **telemetry ingestion path**. They point in the direction the data moves.
+* Thin double-headed arrows are the **UI query and update paths**: a request and its response, or a WebSocket connection that carries a subscribe message to the server and measurements back.
+* The browser talks only to nginx. It never connects to MQTT, PostgreSQL, or the backend ports directly.
+* The ESP32 and the simulator are separate processes that publish to the broker. The backend does not call them.
+
+| Connection | What it represents | Evidence |
+|---|---|---|
+| Inverter to ESP32 | The firmware reads Deye registers with Modbus RTU function `0x03` (9600 baud, 8-N-1, slave address `1`). Read-only. | `firmware/esp32-relay/src/ModbusClient.cpp`, `firmware/esp32-relay/README.md` |
+| ESP32 / simulator to broker | MQTT over plain TCP, default port `1883`. Topic `v1/devices/{deviceId}/telemetry`. The simulator uses `DEVICE_ID` (default `simulator-001`). | `firmware/esp32-relay/src/TelemetryPublisher.cpp`, `simulator/main.cpp` |
+| Broker to backend | The backend subscribes to `v1/devices/+/telemetry` on `MQTT_HOST`:`MQTT_PORT`. | `backend/main.cpp` |
+| Backend to PostgreSQL, step 1 | `TelemetryIngestionService::ingest()` saves the measurement through `MeasurementRepository::save()`. On failure nothing is published to WebSocket clients. | `backend/application/TelemetryIngestionService.cpp` |
+| Backend to WebSocket server, step 2 | After a successful save, the same function calls the handler that runs `WebSocketServer::publish()`, inside the same process. | `backend/application/TelemetryIngestionService.cpp`, `backend/main.cpp` |
+| REST server to PostgreSQL | `GET /api/v1/devices/{deviceId}/measurements` reads stored rows through `MeasurementQueryService` and `MeasurementRepository`. | `backend/api/ApiRoutes.cpp` |
+| nginx to backend | `/api/` is proxied to `backend:8080`; `/ws` is proxied to `backend:8081` with the WebSocket upgrade headers. | `ui/nginx.conf` |
+| Browser to nginx | The page loads the last 100 measurements over REST, then subscribes to one device over WebSocket for live updates. | `ui/src/App.tsx` |
+
+Notes:
+
+* A measurement is written to PostgreSQL before the WebSocket server is called. If the save fails, the measurement is not published and an error is logged. If the save succeeds but the WebSocket delivery fails, the measurement stays stored and a warning is logged.
+* At startup the backend connects to PostgreSQL through libpq (the `PG*` environment variables) and applies schema migrations before it opens any port (see [Schema Migrations](#schema-migrations)).
+* The Compose boundary is the layout from [Deployment](deployment.md). In that layout only the UI is published, on `127.0.0.1:8090`. Ports `8080`, `8081`, and `5432` stay on the Compose network. In development the root `compose.yaml` provides only Mosquitto and PostgreSQL (published on `1883` and `5432`), and the backend, simulator and UI run on the host, with the Vite dev server proxying `/api` and `/ws` to `127.0.0.1:8080` and `127.0.0.1:8081`.
+* The MQTT broker is Mosquitto in the development `compose.yaml`. In the deployment guide it is outside the Compose project, and that guide does not specify which broker software it runs. The port is `1883` unless `MQTT_PORT` (backend, simulator) or the firmware configuration says otherwise.
+* The nginx container listens on port `80`; the deployment example publishes it as `127.0.0.1:8090`.
+
+Not implemented (not shown in the diagram):
+
+* Authentication and TLS for the UI, REST API and WebSocket.
+* MQTT over TLS in the backend, simulator and ESP32 firmware. The backend and firmware can use an MQTT user name and password, the simulator cannot, and the bundled Mosquitto configuration allows anonymous clients.
+* A production Compose file in the repository.
+* Write or control paths: relay control, inverter settings, and any write endpoint. The REST API and the UI are read-only.
+* A device-list endpoint. The UI device ID is fixed at build time in `ui/src/deviceConfig.ts`.
+
 ## Overview
 
 The project is a C++ backend for collecting, storing, and providing access to inverter telemetry.

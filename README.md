@@ -36,7 +36,8 @@ ESP32 firmware / simulator
 ```
 
 Measurements are saved to PostgreSQL first and only then pushed to WebSocket
-clients.
+clients. For ports, protocols and the deployment boundary, see the
+[system architecture diagram](docs/architecture.md#system-architecture).
 
 ## Documentation
 
